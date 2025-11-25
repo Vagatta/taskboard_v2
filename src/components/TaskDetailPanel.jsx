@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TextInput, Tooltip } from 'flowbite-react';
 import { formatRelativeTime, humanizeEventType } from '../utils/dateHelpers';
 
@@ -17,7 +17,9 @@ export default function TaskDetailPanel({
   onDeleteSubtask,
   onRefreshSubtasks,
   onUpdateAssignee,
-  onUpdatePriority
+  onUpdatePriority,
+  onUpdateTags,
+  onUpdateEpic
 }) {
   const [newSubtask, setNewSubtask] = useState('');
   const [creatingSubtask, setCreatingSubtask] = useState(false);
@@ -25,6 +27,18 @@ export default function TaskDetailPanel({
   const [assigneeEditing, setAssigneeEditing] = useState(false);
   const [assigneeSaving, setAssigneeSaving] = useState(false);
   const [prioritySaving, setPrioritySaving] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [tagsSaving, setTagsSaving] = useState(false);
+  const [epicValue, setEpicValue] = useState(task?.epic ?? '');
+  const [epicSaving, setEpicSaving] = useState(false);
+  
+  useEffect(() => {
+    if (!task) {
+      setEpicValue('');
+      return;
+    }
+    setEpicValue(task.epic ?? '');
+  }, [task]);
 
   if (!task) {
     return (
@@ -48,6 +62,7 @@ export default function TaskDetailPanel({
     : { label: 'Pendiente', color: 'warning' };
   const completedSubtasks = subtasks.filter((item) => item.completed).length;
   const isAssigned = Boolean(task.assigned_to);
+  const tags = Array.isArray(task.tags) ? task.tags : [];
 
   const priority = task.priority ?? 'medium';
   const priorityMeta =
@@ -71,6 +86,77 @@ export default function TaskDetailPanel({
       console.warn('No se pudo crear la subtarea:', error);
     } finally {
       setCreatingSubtask(false);
+    }
+  };
+
+  const handleEpicSave = async () => {
+    if (!onUpdateEpic) {
+      return;
+    }
+
+    const nextEpic = epicValue.trim();
+    const currentEpic = task.epic ?? '';
+
+    if (nextEpic === (currentEpic ?? '')) {
+      return;
+    }
+
+    try {
+      setEpicSaving(true);
+      await onUpdateEpic(task, nextEpic);
+    } catch (error) {
+      console.warn('No se pudo actualizar la epic/grupo de la tarea:', error);
+    } finally {
+      setEpicSaving(false);
+    }
+  };
+
+  const handleAddTag = async (event) => {
+    event.preventDefault();
+    if (!onUpdateTags) {
+      return;
+    }
+
+    const value = newTag.trim().toLowerCase();
+    if (!value) {
+      return;
+    }
+
+    const currentTags = Array.isArray(task.tags) ? task.tags : [];
+    const exists = currentTags.some((tag) => (tag ?? '').toLowerCase() === value);
+    if (exists) {
+      setNewTag('');
+      return;
+    }
+
+    const nextTags = [...currentTags, value];
+
+    try {
+      setTagsSaving(true);
+      await onUpdateTags(task, nextTags);
+      setNewTag('');
+    } catch (error) {
+      console.warn('No se pudieron actualizar las etiquetas de la tarea:', error);
+    } finally {
+      setTagsSaving(false);
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove) => {
+    if (!onUpdateTags) {
+      return;
+    }
+
+    const currentTags = Array.isArray(task.tags) ? task.tags : [];
+    const nextTags = currentTags.filter((tag) => tag !== tagToRemove);
+
+    try {
+      setTagsSaving(true);
+      await onUpdateTags(task, nextTags);
+    } catch (error) {
+      console.warn('No se pudieron actualizar las etiquetas de la tarea:', error);
+    } finally {
+      setTagsSaving(false);
     }
   };
 
@@ -242,6 +328,77 @@ export default function TaskDetailPanel({
                 <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
               </div>
             </div>
+          </section>
+
+          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Epic / Grupo</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <TextInput
+                type="text"
+                value={epicValue}
+                onChange={(event) => setEpicValue(event.target.value)}
+                onBlur={handleEpicSave}
+                placeholder="Ej. Onboarding, Infra, Marketing..."
+                maxLength={80}
+                disabled={epicSaving}
+                className="w-full min-w-[10rem] sm:flex-1"
+              />
+              <Button
+                size="xs"
+                color="light"
+                disabled={epicSaving}
+                onClick={handleEpicSave}
+                className="w-full sm:w-auto"
+              >
+                {epicSaving ? 'Guardando…' : 'Guardar epic'}
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Usa este campo para agrupar tareas relacionadas por iniciativa o área.
+            </p>
+          </section>
+
+          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Etiquetas</p>
+            {tags.length ? (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/60 px-2 py-0.5 text-[11px] text-slate-100 hover:border-cyan-400 hover:text-cyan-100"
+                    onClick={() => handleRemoveTag(tag)}
+                    disabled={tagsSaving}
+                  >
+                    <span>#{tag}</span>
+                    <span className="text-slate-500">×</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">Aún no hay etiquetas. Añade algunas para clasificar esta tarea.</p>
+            )}
+            <form
+              className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center"
+              onSubmit={handleAddTag}
+            >
+              <TextInput
+                type="text"
+                placeholder="Añadir etiqueta (bug, frontend, infra...)"
+                value={newTag}
+                onChange={(event) => setNewTag(event.target.value)}
+                maxLength={32}
+                disabled={tagsSaving}
+              />
+              <Button
+                type="submit"
+                size="xs"
+                color="info"
+                disabled={tagsSaving || !newTag.trim()}
+              >
+                {tagsSaving ? 'Guardando…' : 'Añadir etiqueta'}
+              </Button>
+            </form>
           </section>
 
           <section className="space-y-2 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">

@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Alert, Badge, Button, Card, Select, Spinner, TabItem, Tabs, TextInput } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TabItem, Tabs, TextInput } from 'flowbite-react';
 import ActivityLog from './components/ActivityLog';
 import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
@@ -20,6 +20,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
   const [statusFilter, setStatusFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [sortMode, setSortMode] = useState('default');
+  const [tagFilter, setTagFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [createdFromFilter, setCreatedFromFilter] = useState('');
   const [createdToFilter, setCreatedToFilter] = useState('');
@@ -28,6 +30,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
   const [viewMode, setViewMode] = useState('list');
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [sectionsGrouping, setSectionsGrouping] = useState('dates');
   const newTaskInputRef = useRef(null);
   const [taskCommentMeta, setTaskCommentMeta] = useState({});
   const [taskActivityMeta, setTaskActivityMeta] = useState({});
@@ -70,6 +74,70 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
       const { data, error } = await supabase
         .from('tasks')
         .update({ priority: nextPriority, updated_by: userId })
+        .eq('id', task.id)
+        .eq('project_id', projectId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data) {
+        setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+      }
+    },
+    [projectId, userId]
+  );
+
+  const updateTaskEpic = useCallback(
+    async (task, nextEpicRaw) => {
+      if (!projectId) {
+        return;
+      }
+
+      const nextEpic = typeof nextEpicRaw === 'string' ? nextEpicRaw.trim() : '';
+
+      setErrorMessage('');
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ epic: nextEpic.length > 0 ? nextEpic : null, updated_by: userId })
+        .eq('id', task.id)
+        .eq('project_id', projectId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data) {
+        setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+      }
+    },
+    [projectId, userId]
+  );
+
+  const updateTaskTags = useCallback(
+    async (task, nextTags) => {
+      if (!projectId) {
+        return;
+      }
+
+      const safeTags = Array.isArray(nextTags)
+        ? nextTags
+            .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+            .filter((tag, index, array) => tag && array.indexOf(tag) === index)
+        : [];
+
+      setErrorMessage('');
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ tags: safeTags, updated_by: userId })
         .eq('id', task.id)
         .eq('project_id', projectId)
         .select()
@@ -194,7 +262,23 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     return { overdue, dueToday };
   }, [tasks]);
 
+  const availableTags = useMemo(() => {
+    const tagSet = new Set();
+    for (const task of tasks) {
+      if (Array.isArray(task.tags)) {
+        for (const tag of task.tags) {
+          const trimmed = typeof tag === 'string' ? tag.trim().toLowerCase() : '';
+          if (trimmed) {
+            tagSet.add(trimmed);
+          }
+        }
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [tasks]);
+
   const filteredTasks = useMemo(() => {
+    const normalizedTagFilter = tagFilter.trim().toLowerCase();
     return tasks.filter((task) => {
       if (statusFilter === 'completed' && !task.completed) return false;
       if (statusFilter === 'pending' && task.completed) return false;
@@ -207,6 +291,16 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
       if (priorityFilter !== 'all') {
         const priority = task.priority ?? 'medium';
         if (priority !== priorityFilter) {
+          return false;
+        }
+      }
+
+      if (normalizedTagFilter) {
+        const taskTags = Array.isArray(task.tags) ? task.tags : [];
+        const hasTag = taskTags.some(
+          (tag) => typeof tag === 'string' && tag.trim().toLowerCase() === normalizedTagFilter
+        );
+        if (!hasTag) {
           return false;
         }
       }
@@ -265,8 +359,63 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     priorityFilter,
     searchQuery,
     statusFilter,
+    tagFilter,
     tasks
   ]);
+
+  const sortedTasks = useMemo(() => {
+    if (!filteredTasks.length) {
+      return filteredTasks;
+    }
+
+    const copy = [...filteredTasks];
+
+    if (sortMode === 'priority') {
+      const rank = { high: 0, medium: 1, low: 2 };
+      copy.sort((first, second) => {
+        const aPriority = rank[first.priority ?? 'medium'] ?? 1;
+        const bPriority = rank[second.priority ?? 'medium'] ?? 1;
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+
+        const aDue = first.due_date ? new Date(first.due_date).getTime() : Number.POSITIVE_INFINITY;
+        const bDue = second.due_date ? new Date(second.due_date).getTime() : Number.POSITIVE_INFINITY;
+        if (aDue !== bDue) {
+          return aDue - bDue;
+        }
+
+        const aInserted = first.inserted_at ? new Date(first.inserted_at).getTime() : 0;
+        const bInserted = second.inserted_at ? new Date(second.inserted_at).getTime() : 0;
+        return bInserted - aInserted;
+      });
+    } else if (sortMode === 'due_date') {
+      copy.sort((first, second) => {
+        const aDue = first.due_date ? new Date(first.due_date).getTime() : Number.POSITIVE_INFINITY;
+        const bDue = second.due_date ? new Date(second.due_date).getTime() : Number.POSITIVE_INFINITY;
+        if (aDue !== bDue) {
+          return aDue - bDue;
+        }
+
+        const aInserted = first.inserted_at ? new Date(first.inserted_at).getTime() : 0;
+        const bInserted = second.inserted_at ? new Date(second.inserted_at).getTime() : 0;
+        return bInserted - aInserted;
+      });
+    } else if (sortMode === 'last_activity') {
+      const getLastActivityTimestamp = (task) => {
+        const taskId = task.id;
+        const activity = taskActivityMeta[taskId];
+        const activityTime = activity?.createdAt ? new Date(activity.createdAt).getTime() : 0;
+        const commentTime = taskCommentMeta[taskId] ? new Date(taskCommentMeta[taskId]).getTime() : 0;
+        const updatedTime = task.updated_at ? new Date(task.updated_at).getTime() : 0;
+        return Math.max(activityTime, commentTime, updatedTime);
+      };
+
+      copy.sort((first, second) => getLastActivityTimestamp(second) - getLastActivityTimestamp(first));
+    }
+
+    return copy;
+  }, [filteredTasks, sortMode, taskActivityMeta, taskCommentMeta]);
 
   const isFilteredEmpty = useMemo(
     () => !loading && projectId && totalTasks > 0 && filteredTasks.length === 0,
@@ -556,23 +705,32 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
 
   const quickFilters = useMemo(() => {
     const presets = [
-      { id: 'all', label: 'Ver todo', status: 'all', assignee: 'all', priority: 'all' },
-      { id: 'pending', label: 'Solo pendientes', status: 'pending', assignee: 'all', priority: 'all' },
+      { id: 'all', label: 'Ver todo', status: 'all', assignee: 'all', priority: 'all', tag: '' },
+      { id: 'pending', label: 'Solo pendientes', status: 'pending', assignee: 'all', priority: 'all', tag: '' },
       {
         id: 'pending-unassigned',
         label: 'Pendientes sin responsable',
         status: 'pending',
         assignee: 'unassigned',
-        priority: 'all'
+        priority: 'all',
+        tag: ''
       },
-      { id: 'completed', label: 'Solo completadas', status: 'completed', assignee: 'all', priority: 'all' },
-      { id: 'high-all', label: 'Solo prioridad alta', status: 'all', assignee: 'all', priority: 'high' },
+      {
+        id: 'completed',
+        label: 'Solo completadas',
+        status: 'completed',
+        assignee: 'all',
+        priority: 'all',
+        tag: ''
+      },
+      { id: 'high-all', label: 'Solo prioridad alta', status: 'all', assignee: 'all', priority: 'high', tag: '' },
       {
         id: 'high-pending',
         label: 'Pendientes · alta',
         status: 'pending',
         assignee: 'all',
-        priority: 'high'
+        priority: 'high',
+        tag: ''
       }
     ];
 
@@ -582,22 +740,76 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
         label: 'Asignadas a mí',
         status: 'all',
         assignee: membersById[userId].member_id,
-        priority: 'all'
+        priority: 'all',
+        tag: ''
+      });
+    }
+
+    if (availableTags.includes('bug')) {
+      presets.push({
+        id: 'tag-bug',
+        label: 'Solo bugs',
+        status: 'all',
+        assignee: 'all',
+        priority: 'all',
+        tag: 'bug'
+      });
+    }
+
+    if (availableTags.includes('frontend')) {
+      presets.push({
+        id: 'tag-frontend',
+        label: 'Solo frontend',
+        status: 'all',
+        assignee: 'all',
+        priority: 'all',
+        tag: 'frontend'
       });
     }
 
     return presets;
-  }, [membersById, userId]);
+  }, [availableTags, membersById, userId]);
 
   const kanbanColumns = useMemo(
     () => ({
-      pending: filteredTasks.filter((task) => !task.completed),
-      completed: filteredTasks.filter((task) => task.completed)
+      pending: sortedTasks.filter((task) => !task.completed),
+      completed: sortedTasks.filter((task) => task.completed)
     }),
-    [filteredTasks]
+    [sortedTasks]
   );
 
   const boardSections = useMemo(() => {
+    if (sectionsGrouping === 'epic') {
+      const groups = new Map();
+
+      for (const task of filteredTasks) {
+        const rawEpic = typeof task.epic === 'string' ? task.epic.trim() : '';
+        const label = rawEpic.length > 0 ? rawEpic : 'Sin epic / grupo';
+        if (!groups.has(label)) {
+          groups.set(label, []);
+        }
+        groups.get(label).push(task);
+      }
+
+      const entries = Array.from(groups.entries()).sort(([firstLabel], [secondLabel]) =>
+        firstLabel.localeCompare(secondLabel, 'es', { sensitivity: 'base' })
+      );
+
+      return entries.map(([label, tasksForSection]) => {
+        const slug = label
+          .toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/gi, '') || 'sin-epic';
+
+        return {
+          id: `epic-${slug}`,
+          title: label,
+          emptyLabel: 'Sin tareas en este grupo.',
+          tasks: tasksForSection
+        };
+      });
+    }
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(todayStart);
@@ -668,7 +880,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
         tasks: tasksForSection
       };
     });
-  }, [filteredTasks]);
+  }, [filteredTasks, sectionsGrouping]);
 
   const loadTasks = useCallback(async () => {
     if (!userId || !projectId) {
@@ -683,7 +895,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
       supabase
         .from('tasks')
         .select(
-          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,updated_by,updated_at,priority'
+          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,updated_by,updated_at,priority,tags,epic'
         )
         .eq('project_id', projectId)
         .order('inserted_at', { ascending: false });
@@ -841,6 +1053,103 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     [membersById, projectId, setAssigneeEditTaskId, userId]
   );
 
+  const handleBulkUpdateCompletion = useCallback(
+    async (nextCompleted) => {
+      if (!projectId || !userId || selectedTaskIds.length === 0) {
+        return;
+      }
+
+      setErrorMessage('');
+      const completionTimestamp = nextCompleted ? new Date().toISOString() : null;
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ completed: nextCompleted, completed_at: completionTimestamp, updated_by: userId })
+        .eq('project_id', projectId)
+        .in('id', selectedTaskIds)
+        .select();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setTasks((previous) => {
+          const updatedMap = new Map(data.map((item) => [item.id, item]));
+          return previous.map((item) => updatedMap.get(item.id) ?? item);
+        });
+        setSelectedTaskIds([]);
+      }
+    },
+    [projectId, selectedTaskIds, userId]
+  );
+
+  const handleBulkUpdatePriority = useCallback(
+    async (nextPriority) => {
+      if (!projectId || !userId || selectedTaskIds.length === 0 || !nextPriority) {
+        return;
+      }
+
+      setErrorMessage('');
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ priority: nextPriority, updated_by: userId })
+        .eq('project_id', projectId)
+        .in('id', selectedTaskIds)
+        .select();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setTasks((previous) => {
+          const updatedMap = new Map(data.map((item) => [item.id, item]));
+          return previous.map((item) => updatedMap.get(item.id) ?? item);
+        });
+        setSelectedTaskIds([]);
+      }
+    },
+    [projectId, selectedTaskIds, userId]
+  );
+
+  const handleBulkUpdateAssignee = useCallback(
+    async (assigneeId) => {
+      if (!projectId || !userId || selectedTaskIds.length === 0) {
+        return;
+      }
+
+      setErrorMessage('');
+      const shouldUnassign = assigneeId === '__unassign__';
+      const member = shouldUnassign || !assigneeId ? null : membersById[assigneeId];
+      const assignedTo = member ? member.member_id : null;
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ assigned_to: assignedTo, updated_by: userId })
+        .eq('project_id', projectId)
+        .in('id', selectedTaskIds)
+        .select();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setTasks((previous) => {
+          const updatedMap = new Map(data.map((item) => [item.id, item]));
+          return previous.map((item) => updatedMap.get(item.id) ?? item);
+        });
+        setSelectedTaskIds([]);
+      }
+    },
+    [membersById, projectId, selectedTaskIds, userId]
+  );
+
   const deleteTask = useCallback(
     async (taskId) => {
       setPendingTaskId(taskId);
@@ -919,6 +1228,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     const completedVisible = filteredTasks.filter((task) => task.completed).length;
     const pendingVisible = visibleTasks - completedVisible;
     const now = Date.now();
+    const hasSelection = selectedTaskIds.length > 0;
+    const allVisibleSelected = hasSelection && selectedTaskIds.length === visibleTasks;
 
     return (
       <div className="flex flex-col gap-3">
@@ -927,11 +1238,81 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
           <span className="text-emerald-300">Completadas: {completedVisible}</span>
           <span className="text-amber-200">Pendientes: {pendingVisible}</span>
         </div>
+        {hasSelection ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-700 bg-cyan-950/40 px-4 py-2 text-xs text-slate-200">
+            <span className="text-sm font-semibold text-cyan-100">
+              {selectedTaskIds.length} tarea
+              {selectedTaskIds.length === 1 ? '' : 's'} seleccionada
+              {selectedTaskIds.length === 1 ? '' : 's'}
+            </span>
+            <Button size="xs" color="success" onClick={() => void handleBulkUpdateCompletion(true)}>
+              Marcar como completadas
+            </Button>
+            <Button size="xs" color="warning" onClick={() => void handleBulkUpdateCompletion(false)}>
+              Marcar como pendientes
+            </Button>
+            <Select
+              sizing="sm"
+              className="w-40"
+              defaultValue=""
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value) {
+                  void handleBulkUpdatePriority(value);
+                  event.target.value = '';
+                }
+              }}
+            >
+              <option value="">Cambiar prioridad…</option>
+              <option value="high">Alta</option>
+              <option value="medium">Media</option>
+              <option value="low">Baja</option>
+            </Select>
+            {members.length > 0 ? (
+              <Select
+                sizing="sm"
+                className="w-56"
+                defaultValue=""
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value) {
+                    void handleBulkUpdateAssignee(value);
+                    event.target.value = '';
+                  }
+                }}
+              >
+                <option value="">Cambiar responsable…</option>
+                <option value="__unassign__">Quitar responsable</option>
+                {members.map((member) => (
+                  <option key={member.member_id} value={member.member_id}>
+                    {member.member_email ?? member.member_id}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            <Button size="xs" color="gray" onClick={() => setSelectedTaskIds([])}>
+              Limpiar selección
+            </Button>
+          </div>
+        ) : null}
         <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/40 shadow-lg shadow-slate-950/40">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm text-slate-100">
               <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <Checkbox
+                      checked={allVisibleSelected}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        if (checked) {
+                          setSelectedTaskIds(sortedTasks.map((task) => task.id));
+                        } else {
+                          setSelectedTaskIds([]);
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="px-4 py-3 w-10">&nbsp;</th>
                   <th className="px-4 py-3 text-left">Tarea</th>
                   <th className="px-4 py-3 text-left">Responsable</th>
@@ -943,7 +1324,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map((task) => {
+                {sortedTasks.map((task) => {
                   const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
                   const statusMeta = task.completed
                     ? { label: 'Completada', color: 'success' }
@@ -958,6 +1339,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                   const subtaskCompleted = subtaskCount?.completed ?? 0;
                   const subtaskProgress = subtaskTotal > 0 ? Math.round((subtaskCompleted / subtaskTotal) * 100) : 0;
                   const isHighPriority = task.priority === 'high';
+                  const tags = Array.isArray(task.tags) ? task.tags : [];
 
                   const rowBaseClass = 'border-b border-slate-900/40 transition-colors';
                   const rowClass = isSelected
@@ -972,6 +1354,24 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                       className={`${rowClass} cursor-pointer`}
                       onClick={() => setSelectedTaskDetail(task)}
                     >
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedTaskIds.includes(task.id)}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            const checked = event.target.checked;
+                            setSelectedTaskIds((previous) => {
+                              if (checked) {
+                                if (previous.includes(task.id)) {
+                                  return previous;
+                                }
+                                return [...previous, task.id];
+                              }
+                              return previous.filter((id) => id !== task.id);
+                            });
+                          }}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <button
                           type="button"
@@ -996,6 +1396,21 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                         ) : null}
                         {subtaskCount ? (
                           <p className="text-xs text-slate-400">{subtaskCount.completed}/{subtaskCount.total} subtareas</p>
+                        ) : null}
+                        {tags.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {tags.slice(0, 4).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] text-slate-200"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                            {tags.length > 4 ? (
+                              <span className="text-[10px] text-slate-500">+{tags.length - 4} más</span>
+                            ) : null}
+                          </div>
                         ) : null}
                       </td>
                       <td className="px-4 py-3 text-slate-300">{assigneeMember?.member_email ?? 'Sin asignar'}</td>
@@ -1057,10 +1472,16 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     filteredTasks,
     isEmpty,
     isFilteredEmpty,
+    handleBulkUpdateAssignee,
+    handleBulkUpdateCompletion,
+    handleBulkUpdatePriority,
     loading,
+    members,
     membersById,
     projectId,
     selectedTaskDetail?.id,
+    sortedTasks,
+    selectedTaskIds,
     subtaskMeta,
     tasks.length,
     toggleTaskCompletion
@@ -1181,12 +1602,14 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
       setStatusFilter('all');
       setAssigneeFilter('all');
       setPriorityFilter('all');
+      setSortMode('default');
       setViewMode('list');
       setCreatedFromFilter('');
       setCreatedToFilter('');
       setDueBeforeFilter('');
       setCompletedBeforeFilter('');
       setSearchQuery('');
+      setTagFilter('');
       return;
     }
 
@@ -1229,6 +1652,15 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
         if (typeof parsed.completedBeforeFilter === 'string') {
           setCompletedBeforeFilter(parsed.completedBeforeFilter);
         }
+        if (typeof parsed.tagFilter === 'string') {
+          setTagFilter(parsed.tagFilter);
+        }
+        if (
+          typeof parsed.sortMode === 'string' &&
+          ['default', 'priority', 'due_date', 'last_activity'].includes(parsed.sortMode)
+        ) {
+          setSortMode(parsed.sortMode);
+        }
       }
     } catch (storageError) {
       console.warn('No se pudieron cargar filtros de tareas almacenados:', storageError);
@@ -1249,6 +1681,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
           statusFilter,
           assigneeFilter,
           priorityFilter,
+          tagFilter,
           searchQuery,
           viewMode,
           createdFromFilter,
@@ -1271,6 +1704,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
     priorityFilter,
     searchQuery,
     statusFilter,
+    sortMode,
+    tagFilter,
     viewMode
   ]);
 
@@ -1350,6 +1785,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
           : priority === 'low'
             ? { label: 'Baja', color: 'success' }
             : { label: 'Media', color: 'warning' };
+      const tags = Array.isArray(task.tags) ? task.tags : [];
 
       return (
         <div
@@ -1393,6 +1829,21 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
               {subtaskTotal > 0 ? (
                 <span>
                   Subtareas: {subtaskCompleted}/{subtaskTotal} ({subtaskProgress}%)
+                </span>
+              ) : null}
+              {tags.length > 0 ? (
+                <span className="flex flex-wrap gap-1">
+                  {tags.slice(0, 4).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] text-slate-200"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                  {tags.length > 4 ? (
+                    <span className="text-[10px] text-slate-500">+{tags.length - 4} más</span>
+                  ) : null}
                 </span>
               ) : null}
             </div>
@@ -1555,6 +2006,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
           const subTotal = subMeta?.total ?? 0;
           const subCompleted = subMeta?.completed ?? 0;
           const subProgress = subTotal > 0 ? Math.round((subCompleted / subTotal) * 100) : 0;
+          const tags = Array.isArray(task.tags) ? task.tags : [];
 
           return (
             <div
@@ -1597,6 +2049,21 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                   ? ` · ${subtaskMeta[task.id].completed}/${subtaskMeta[task.id].total} subtareas`
                   : ''}
               </p>
+              {tags.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-200">
+                  {tags.slice(0, 3).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-slate-900/80 px-2 py-0.5"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                  {tags.length > 3 ? (
+                    <span className="text-slate-500">+{tags.length - 3} más</span>
+                  ) : null}
+                </div>
+              ) : null}
               {subtaskMeta[task.id] ? (
                 <div className="mt-1 h-1 w-full rounded-full bg-slate-800">
                   <div
@@ -1686,79 +2153,104 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
 
       if (mode === 'sections') {
         return (
-          <div className="grid gap-4 lg:grid-cols-4">
-            {boardSections.map((section) => (
-              <div key={section.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="font-semibold text-white">{section.title}</span>
-                  <Badge color={section.tasks.length ? 'info' : 'gray'}>{section.tasks.length}</Badge>
-                </div>
-                <div className="mt-3 space-y-3">
-                  {section.tasks.length === 0 ? (
-                    <p className="text-xs text-slate-500">{section.emptyLabel}</p>
-                  ) : (
-                    section.tasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="cursor-pointer rounded-xl border border-slate-800 bg-slate-900/40 p-3 transition hover:border-cyan-400 hover:bg-cyan-500/5"
-                        onClick={() => setSelectedTaskDetail(task)}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`truncate text-sm font-semibold ${
-                                task.completed ? 'text-slate-400 line-through' : 'text-white'
-                              }`}
-                            >
-                              {task.title}
-                            </p>
-                            {task.description ? (
-                              <p className="text-xs text-slate-500">
-                                {task.description.slice(0, 80)}
-                                {task.description.length > 80 ? '…' : ''}
-                              </p>
-                            ) : null}
-                          </div>
-                          <button
-                            type="button"
-                            className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-[10px] text-slate-400"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleTaskCompletion(task);
-                            }}
-                          >
-                            <span className="sr-only">
-                              {task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
-                            </span>
-                            <span className={task.completed ? 'text-emerald-300' : 'text-transparent'}>✓</span>
-                          </button>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                          <span className="max-w-full break-words">
-                            {task.assigned_to
-                              ? membersById[task.assigned_to]?.member_email ?? 'Responsable'
-                              : 'Sin asignar'}
-                          </span>
-                          {task.due_date ? (
-                            <span>{new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(new Date(task.due_date))}</span>
-                          ) : (
-                            <span>Sin fecha</span>
-                          )}
-                          <span>
-                            {task.updated_at
-                              ? `Actualizada ${formatRelativeTime(new Date(task.updated_at))}`
-                              : 'Sin actividad reciente'}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  <Button size="xs" color="gray" className="w-full" onClick={() => newTaskInputRef.current?.focus()}>
-                    + Agregar tarea
-                  </Button>
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold text-white">Vista tablón</span>
+              <div className="flex gap-2">
+                <Button
+                  size="xs"
+                  color={sectionsGrouping === 'dates' ? 'info' : 'gray'}
+                  onClick={() => setSectionsGrouping('dates')}
+                >
+                  Por fechas
+                </Button>
+                <Button
+                  size="xs"
+                  color={sectionsGrouping === 'epic' ? 'info' : 'gray'}
+                  onClick={() => setSectionsGrouping('epic')}
+                >
+                  Por epic / grupo
+                </Button>
               </div>
-            ))}
+            </div>
+            <div className="grid gap-4 lg:grid-cols-4">
+              {boardSections.map((section) => (
+                <div key={section.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div className="flex items-center justify_between text-xs text-slate-400">
+                    <span className="font-semibold text-white">{section.title}</span>
+                    <Badge color={section.tasks.length ? 'info' : 'gray'}>{section.tasks.length}</Badge>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {section.tasks.length === 0 ? (
+                      <p className="text-xs text-slate-500">{section.emptyLabel}</p>
+                    ) : (
+                      section.tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className="cursor-pointer rounded-xl border border-slate-800 bg-slate-900/40 p-3 transition hover:border-cyan-400 hover:bg-cyan-500/5"
+                          onClick={() => setSelectedTaskDetail(task)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`truncate text-sm font-semibold ${
+                                  task.completed ? 'text-slate-400 line-through' : 'text-white'
+                                }`}
+                              >
+                                {task.title}
+                              </p>
+                              {task.description ? (
+                                <p className="text-xs text-slate-500">
+                                  {task.description.slice(0, 80)}
+                                  {task.description.length > 80 ? '…' : ''}
+                                </p>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-[10px] text-slate-400"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleTaskCompletion(task);
+                              }}
+                            >
+                              <span className="sr-only">
+                                {task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
+                              </span>
+                              <span className={task.completed ? 'text-emerald-300' : 'text-transparent'}>✓</span>
+                            </button>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                            <span className="max-w-full break-words">
+                              {task.assigned_to
+                                ? membersById[task.assigned_to]?.member_email ?? 'Responsable'
+                                : 'Sin asignar'}
+                            </span>
+                            {task.due_date ? (
+                              <span>
+                                {new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(
+                                  new Date(task.due_date)
+                                )}
+                              </span>
+                            ) : (
+                              <span>Sin fecha</span>
+                            )}
+                            <span>
+                              {task.updated_at
+                                ? `Actualizada ${formatRelativeTime(new Date(task.updated_at))}`
+                                : 'Sin actividad reciente'}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <Button size="xs" color="gray" className="w-full" onClick={() => newTaskInputRef.current?.focus()}>
+                      + Agregar tarea
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
       }
@@ -1946,7 +2438,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
               const isActive =
                 statusFilter === preset.status &&
                 assigneeFilter === preset.assignee &&
-                priorityFilter === (preset.priority ?? 'all');
+                priorityFilter === (preset.priority ?? 'all') &&
+                tagFilter === (preset.tag ?? '');
               return (
                 <Button
                   key={preset.id}
@@ -1957,6 +2450,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                     setStatusFilter(preset.status);
                     setAssigneeFilter(preset.assignee);
                     setPriorityFilter(preset.priority ?? 'all');
+                    setTagFilter(preset.tag ?? '');
                   }}
                 >
                   {preset.label}
@@ -1964,7 +2458,7 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
               );
             })}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-slate-500">Estado</span>
               <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -1994,6 +2488,30 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
                 <option value="low">Baja</option>
               </Select>
             </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-500">Etiqueta</span>
+              <Select
+                value={tagFilter}
+                onChange={(event) => setTagFilter(event.target.value)}
+                disabled={availableTags.length === 0}
+              >
+                <option value="">Todas</option>
+                {availableTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500">Ordenar por</span>
+            <Select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+              <option value="default">Por defecto (creación reciente)</option>
+              <option value="priority">Prioridad (alta primero)</option>
+              <option value="due_date">Fecha de vencimiento</option>
+              <option value="last_activity">Última actividad</option>
+            </Select>
           </div>
         </div>
       </Card>
@@ -2031,6 +2549,8 @@ const TaskList = forwardRef(function TaskList({ user, projectId, project, member
           onRefreshSubtasks={selectedTaskDetail ? () => loadSubtasksForTask(selectedTaskDetail.id) : undefined}
           onUpdateAssignee={updateTaskAssignee}
           onUpdatePriority={updateTaskPriority}
+          onUpdateTags={updateTaskTags}
+          onUpdateEpic={updateTaskEpic}
         />
       </div>
 
