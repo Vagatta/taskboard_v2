@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Label, Spinner, Tabs, TabItem, TextInput, ToggleSwitch } from 'flowbite-react';
 import './App.css';
 import AppLayout from './components/AppLayout';
-import WorkspaceSelector from './components/WorkspaceSelector';
-import ProjectSelector from './components/ProjectSelector';
+import WorkspaceManagementPanel from './components/WorkspaceManagementPanel';
+import ProjectsManagementPanel from './components/ProjectsManagementPanel';
+import TasksManagementPanel from './components/TasksManagementPanel';
 import UserPanel from './components/UserPanel';
 import NotificationPanel from './components/NotificationPanel';
 import { useAuth } from './context/AuthContext';
-import TaskList from './TaskList';
 
 const navIcons = {
   dashboard: (
@@ -29,6 +29,7 @@ const navIcons = {
   )
 };
 
+// Formulario sencillo de login/registro con email y contraseña.
 function AuthForm() {
   const { signIn, signUp, authLoading, error, setError } = useAuth();
   const [email, setEmail] = useState('');
@@ -112,6 +113,7 @@ function AuthForm() {
   );
 }
 
+// Contenedor principal de la app: navegación, paneles de gestión y estado global.
 function App() {
   const { user, initializing, authLoading, signOut } = useAuth();
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
@@ -143,6 +145,7 @@ function App() {
   );
 
   useEffect(() => {
+    // Atajos de teclado globales (Ctrl+G para nueva tarea rápida, Ctrl+V para cambiar vista).
     const handleGlobalShortcut = (event) => {
       const isCtrlOrMeta = event.ctrlKey || event.metaKey;
       if (!isCtrlOrMeta || event.repeat || event.altKey) {
@@ -418,75 +421,45 @@ function App() {
         active={activeManagementTab === 'workspace'}
         onClick={() => setActiveManagementTab('workspace')}
       >
-        <div className="space-y-6">
-          <WorkspaceSelector
-            user={user}
-            selectedWorkspaceId={selectedWorkspaceId}
-            onSelect={handleWorkspaceSelect}
-            onWorkspacesChange={handleWorkspacesChange}
-            onWorkspaceMembersChange={handleWorkspaceMembersChange}
-          />
-        </div>
+        <WorkspaceManagementPanel
+          user={user}
+          selectedWorkspaceId={selectedWorkspaceId}
+          onSelect={handleWorkspaceSelect}
+          onWorkspacesChange={handleWorkspacesChange}
+          onWorkspaceMembersChange={handleWorkspaceMembersChange}
+        />
       </TabItem>
       <TabItem
         title="Proyectos"
         active={activeManagementTab === 'proyectos'}
         onClick={() => setActiveManagementTab('proyectos')}
       >
-        <div className="space-y-6">
-          {!selectedWorkspaceId ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400" aria-live="polite">
-              Selecciona un workspace para gestionar proyectos.
-            </div>
-          ) : (
-            <>
-              <ProjectSelector
-                user={user}
-                workspaceId={selectedWorkspaceId}
-                selectedProjectId={selectedProjectId}
-                onSelect={handleProjectSelect}
-                onProjectsChange={handleProjectsChange}
-                onProjectMembersChange={handleProjectMembersChange}
-              />
-              {projects.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400" aria-live="polite">
-                  Crea tu primer proyecto para gestionar tareas.
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+        <ProjectsManagementPanel
+          user={user}
+          selectedWorkspaceId={selectedWorkspaceId}
+          selectedProjectId={selectedProjectId}
+          projects={projects}
+          onProjectSelect={handleProjectSelect}
+          onProjectsChange={handleProjectsChange}
+          onProjectMembersChange={handleProjectMembersChange}
+        />
       </TabItem>
       <TabItem
         title="Tareas"
         active={activeManagementTab === 'tareas'}
         onClick={() => setActiveManagementTab('tareas')}
       >
-        <div className="space-y-6">
-          {!selectedWorkspaceId ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400" aria-live="polite">
-              Selecciona un workspace para ver tareas.
-            </div>
-          ) : projects.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400" aria-live="polite">
-              Crea un proyecto antes de gestionar tareas.
-            </div>
-          ) : selectedProjectId && selectedProject ? (
-            <TaskList
-              ref={taskListRef}
-              user={user}
-              projectId={selectedProjectId}
-              project={selectedProject}
-              members={selectedProjectMembers}
-              onViewModeChange={setActiveViewMode}
-              onTaskSummaryChange={setTaskSummary}
-            />
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400" aria-live="polite">
-              Selecciona un proyecto para ver sus tareas.
-            </div>
-          )}
-        </div>
+        <TasksManagementPanel
+          user={user}
+          selectedWorkspaceId={selectedWorkspaceId}
+          selectedProjectId={selectedProjectId}
+          selectedProject={selectedProject}
+          selectedProjectMembers={selectedProjectMembers}
+          projects={projects}
+          taskListRef={taskListRef}
+          onViewModeChange={setActiveViewMode}
+          onTaskSummaryChange={setTaskSummary}
+        />
       </TabItem>
     </Tabs>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Alert, Badge, Button, Card, Checkbox, Select, Spinner } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 
@@ -145,7 +146,7 @@ export default function ActivityLog({ projectId, members = [] }) {
   }, [fromBoundary, projectId, selectedActions, selectedUser, toBoundary]);
 
   useEffect(() => {
-    void loadLog();
+     loadLog();
   }, [loadLog]);
 
   useEffect(() => {
@@ -207,6 +208,44 @@ export default function ActivityLog({ projectId, members = [] }) {
   };
 
   const currentPreset = RANGE_PRESETS.find((preset) => preset.value === rangeDays)?.value ?? 'custom';
+
+  let content;
+
+  if (loading) {
+    content = (
+      <div className="flex justify-center py-8">
+        <Spinner size="lg" />
+      </div>
+    );
+  } else if (logs.length === 0) {
+    content = (
+      <p className="text-sm text-slate-500">
+        Sin actividad registrada para los filtros seleccionados.
+      </p>
+    );
+  } else {
+    content = (
+      <div className="space-y-3">
+        {logs.map((log) => {
+          const member = membersById[log.actor_id];
+          const meta = ACTION_META[log.event_type] ?? ACTION_META.default;
+          return (
+            <div key={log.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                <Badge color={meta.color}>{meta.label}</Badge>
+                <span className="font-semibold text-white">
+                  {member?.member_email ?? log.actor_id ?? 'Sistema'}
+                </span>
+                <span>{formatLocaleDate(log.created_at)}</span>
+                {log.task_id ? <span>Tarea #{log.task_id.slice(0, 8)}…</span> : null}
+              </div>
+              <p className="mt-2 text-sm text-slate-100">{renderDetails(log)}</p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <Card className="bg-slate-950/40">
@@ -312,32 +351,18 @@ export default function ActivityLog({ projectId, members = [] }) {
           </Alert>
         ) : null}
 
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Spinner size="lg" />
-          </div>
-        ) : logs.length === 0 ? (
-          <p className="text-sm text-slate-500">Sin actividad registrada para los filtros seleccionados.</p>
-        ) : (
-          <div className="space-y-3">
-            {logs.map((log) => {
-              const member = membersById[log.actor_id];
-              const meta = ACTION_META[log.event_type] ?? ACTION_META.default;
-              return (
-                <div key={log.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                    <Badge color={meta.color}>{meta.label}</Badge>
-                    <span className="font-semibold text-white">{member?.member_email ?? log.actor_id ?? 'Sistema'}</span>
-                    <span>{formatLocaleDate(log.created_at)}</span>
-                    {log.task_id ? <span>Tarea #{log.task_id.slice(0, 8)}…</span> : null}
-                  </div>
-                  <p className="mt-2 text-sm text-slate-100">{renderDetails(log)}</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {content}
       </div>
     </Card>
   );
 }
+
+ActivityLog.propTypes = {
+  projectId: PropTypes.string,
+  members: PropTypes.arrayOf(
+    PropTypes.shape({
+      member_id: PropTypes.string,
+      member_email: PropTypes.string
+    })
+  )
+};

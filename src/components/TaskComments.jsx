@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Spinner, Textarea } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 
+// Comentarios de una tarea: lista, creación rápida, menciones y algo de control de permisos.
 export default function TaskComments({ taskId, taskTitle, currentUserId, members = [], workspaceId = null, projectId = null }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,10 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
   const [mentionAnchor, setMentionAnchor] = useState(null);
   const [caretIndex, setCaretIndex] = useState(0);
   const textareaRef = useRef(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingBody, setEditingBody] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState(null);
 
   const membersById = useMemo(
     () =>
@@ -56,6 +61,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
       .slice(0, 5);
   }, [mentionQuery, mentionableMembers, showMentionDropdown]);
 
+  // Pequeño detector de @menciones mientras se escribe en el textarea.
   const handleMentionDetection = useCallback((value, cursorPosition) => {
     setCaretIndex(cursorPosition);
     const slice = value.slice(0, cursorPosition);
@@ -107,6 +113,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
         return;
       }
 
+      // Enviamos una notificación interna por cada usuario mencionado.
       const payload = mentionIds.map((userId) => ({
         user_id: userId,
         workspace_id: workspaceId,
@@ -124,6 +131,73 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
     },
     [currentUserId, projectId, taskId, taskTitle, workspaceId]
   );
+
+  const startEditComment = (comment) => {
+    if (!currentUserId || comment.author_id !== currentUserId) {
+      return;
+    }
+    setEditingCommentId(comment.id);
+    setEditingBody(comment.body ?? '');
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingBody('');
+    setSavingEdit(false);
+  };
+
+  const handleSaveCommentEdit = async () => {
+    const body = editingBody.trim();
+    if (!editingCommentId || !body || !currentUserId) {
+      return;
+    }
+
+    setSavingEdit(true);
+    setError('');
+
+    const { error: updateError } = await supabase
+      .from('task_comments')
+      .update({ body })
+      .eq('id', editingCommentId)
+      .eq('author_id', currentUserId);
+
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setComments((prev) => prev.map((comment) => (comment.id === editingCommentId ? { ...comment, body } : comment)));
+      setEditingCommentId(null);
+      setEditingBody('');
+    }
+
+    setSavingEdit(false);
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!commentId || !currentUserId) {
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+    setError('');
+
+    const { error: deleteError } = await supabase
+      .from('task_comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('author_id', currentUserId);
+
+    if (deleteError) {
+      setError(deleteError.message);
+    } else {
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setEditingBody('');
+      }
+    }
+
+    setDeletingCommentId(null);
+  };
 
   const loadComments = useCallback(async () => {
     if (!taskId) {
@@ -159,6 +233,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
       return;
     }
 
+    // Suscripción en tiempo real a los cambios de comentarios de esta tarea.
     const channel = supabase
       .channel(`task-comments-${taskId}`)
       .on(
@@ -171,7 +246,10 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setComments((prev) => [...prev, payload.new]);
+            setComments((prev) => {
+              const exists = prev.some((comment) => comment.id === payload.new.id);
+              return exists ? prev : [...prev, payload.new];
+            });
           } else if (payload.eventType === 'DELETE') {
             setComments((prev) => prev.filter((comment) => comment.id !== payload.old.id));
           } else if (payload.eventType === 'UPDATE') {
@@ -198,12 +276,15 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
 
     const uniqueMentions = [...new Set(mentionedUsers)];
 
-    const { error: insertError } = await supabase.from('task_comments').insert({
-      task_id: taskId,
-      author_id: currentUserId,
-      body,
-      mentions: uniqueMentions
-    });
+    const { data: insertedComments, error: insertError } = await supabase
+      .from('task_comments')
+      .insert({
+        task_id: taskId,
+        author_id: currentUserId,
+        body,
+        mentions: uniqueMentions
+      })
+      .select('id,task_id,author_id,body,mentions,created_at');
 
     if (insertError) {
       if (insertError.message?.toLowerCase().includes('row-level security')) {
@@ -212,6 +293,20 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
         setError(insertError.message);
       }
     } else {
+      const inserted = Array.isArray(insertedComments)
+        ? insertedComments
+        : insertedComments
+        ? [insertedComments]
+        : [];
+
+      if (inserted.length > 0) {
+        setComments((prev) => {
+          const existingIds = new Set(prev.map((c) => c.id));
+          const toAdd = inserted.filter((c) => !existingIds.has(c.id));
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+        });
+      }
+
       if (uniqueMentions.length > 0) {
         try {
           await sendMentionNotifications(body, uniqueMentions);
@@ -251,14 +346,65 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
               const author = membersById[comment.author_id];
               const createdAt = comment.created_at ? new Date(comment.created_at) : null;
               const mentionList = Array.isArray(comment.mentions) ? comment.mentions : [];
+              const isAuthor = currentUserId && comment.author_id === currentUserId;
 
               return (
                 <div key={comment.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                     <span className="font-semibold text-slate-100">{author?.member_email ?? comment.author_id}</span>
                     {createdAt ? <span>{createdAt.toLocaleString()}</span> : null}
+                    {isAuthor ? (
+                      <div className="ml-auto flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-[11px] text-slate-500 hover:text-slate-200 hover:underline underline-offset-2"
+                          onClick={() => startEditComment(comment)}
+                          disabled={savingEdit || deletingCommentId === comment.id}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[11px] text-rose-400 hover:text-rose-200 hover:underline underline-offset-2"
+                          onClick={() => handleDeleteComment(comment.id)}
+                          disabled={savingEdit || deletingCommentId === comment.id}
+                        >
+                          Borrar
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                  <p className="mt-2 text-slate-100">{comment.body}</p>
+                  {editingCommentId === comment.id ? (
+                    <div className="mt-2 space-y-2">
+                      <Textarea
+                        value={editingBody}
+                        onChange={(event) => setEditingBody(event.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        disabled={savingEdit}
+                      />
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Button
+                          size="xs"
+                          color="info"
+                          onClick={handleSaveCommentEdit}
+                          disabled={savingEdit || !editingBody.trim()}
+                        >
+                          {savingEdit ? 'Guardando…' : 'Guardar'}
+                        </Button>
+                        <Button
+                          size="xs"
+                          color="light"
+                          onClick={cancelEditComment}
+                          disabled={savingEdit}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 whitespace-pre-wrap break-words text-slate-100">{comment.body}</p>
+                  )}
                   {mentionList.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {mentionList.map((mentionId) => {

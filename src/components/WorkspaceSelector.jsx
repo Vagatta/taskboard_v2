@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Select, Spinner, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 
+// Selector de workspaces: lista espacios, permite crear nuevos e invitar gente.
 export default function WorkspaceSelector({
   user,
   selectedWorkspaceId,
@@ -40,6 +41,7 @@ export default function WorkspaceSelector({
     [onWorkspaceMembersChange]
   );
 
+  // Carga los workspaces donde el usuario es miembro y sus miembros asociados.
   const loadWorkspaces = useCallback(async () => {
     if (!user?.id) {
       syncWorkspaces([]);
