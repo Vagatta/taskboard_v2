@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TextInput, Tooltip } from 'flowbite-react';
+import { supabase } from '../supabaseClient';
+import TaskComments from './TaskComments';
 import { formatRelativeTime, humanizeEventType } from '../utils/dateHelpers';
 
+// Panel de detalle lateral: aquí es donde se ve y toca casi todo lo importante de una tarea concreta.
 export default function TaskDetailPanel({
   task,
   membersById,
   members = [],
+  workspaceId = null,
+  projectId = null,
+  currentUserId = null,
   onClose,
   activityMeta,
   lastCommentAt,
@@ -19,7 +25,8 @@ export default function TaskDetailPanel({
   onUpdateAssignee,
   onUpdatePriority,
   onUpdateTags,
-  onUpdateEpic
+  onUpdateEpic,
+  onUpdateEffort
 }) {
   const [newSubtask, setNewSubtask] = useState('');
   const [creatingSubtask, setCreatingSubtask] = useState(false);
@@ -31,7 +38,8 @@ export default function TaskDetailPanel({
   const [tagsSaving, setTagsSaving] = useState(false);
   const [epicValue, setEpicValue] = useState(task?.epic ?? '');
   const [epicSaving, setEpicSaving] = useState(false);
-  
+  const [viewers, setViewers] = useState([]);
+
   useEffect(() => {
     if (!task) {
       setEpicValue('');
@@ -39,6 +47,63 @@ export default function TaskDetailPanel({
     }
     setEpicValue(task.epic ?? '');
   }, [task]);
+
+  useEffect(() => {
+    if (!task?.id || !currentUserId) {
+      setViewers([]);
+      return;
+    }
+
+    // Canal de presencia para saber qué otros usuarios tienen esta tarea abierta ahora mismo.
+    const channel = supabase.channel(`task-viewers-${task.id}`, {
+      config: {
+        presence: {
+          key: currentUserId
+        }
+      }
+    });
+
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const others = [];
+
+      Object.entries(state).forEach(([userId, sessions]) => {
+        if (String(userId) === String(currentUserId)) {
+          return;
+        }
+        if (!Array.isArray(sessions) || sessions.length === 0) {
+          return;
+        }
+        const session = sessions[0];
+        others.push({
+          userId,
+          ...session
+        });
+      });
+
+      setViewers(others);
+    });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.track({
+          user_id: currentUserId,
+          task_id: task.id,
+          started_at: new Date().toISOString()
+        });
+      }
+    });
+
+    return () => {
+      try {
+        channel.untrack();
+      } catch (error) {
+        console.warn('No se pudo detener la presencia de la tarea:', error);
+      }
+      void supabase.removeChannel(channel);
+      setViewers([]);
+    };
+  }, [currentUserId, task?.id]);
 
   if (!task) {
     return (
@@ -63,6 +128,10 @@ export default function TaskDetailPanel({
   const completedSubtasks = subtasks.filter((item) => item.completed).length;
   const isAssigned = Boolean(task.assigned_to);
   const tags = Array.isArray(task.tags) ? task.tags : [];
+  const activeViewers = viewers
+    .map((viewer) => membersById[viewer.userId] ?? membersById[viewer.user_id])
+    .filter(Boolean);
+  const viewerNames = activeViewers.map((member) => member.member_email ?? member.member_id);
 
   const priority = task.priority ?? 'medium';
   const priorityMeta =
@@ -71,6 +140,14 @@ export default function TaskDetailPanel({
       : priority === 'low'
         ? { label: 'Baja', color: 'success' }
         : { label: 'Media', color: 'warning' };
+
+  const effort = task.effort ?? 'm';
+  const effortMeta =
+    effort === 's'
+      ? { label: 'S (pequeño)', color: 'success' }
+      : effort === 'l'
+        ? { label: 'L (grande)', color: 'failure' }
+        : { label: 'M (medio)', color: 'indigo' };
 
   const handleCreateSubtask = async (event) => {
     event.preventDefault();
@@ -86,6 +163,23 @@ export default function TaskDetailPanel({
       console.warn('No se pudo crear la subtarea:', error);
     } finally {
       setCreatingSubtask(false);
+    }
+  };
+
+  const handleEffortChange = async (event) => {
+    if (!onUpdateEffort) {
+      return;
+    }
+
+    const nextEffort = event.target.value;
+    if (!nextEffort || nextEffort === (task.effort ?? 'm')) {
+      return;
+    }
+
+    try {
+      await onUpdateEffort(task, nextEffort);
+    } catch (error) {
+      console.warn('No se pudo actualizar el esfuerzo de la tarea:', error);
     }
   };
 
@@ -236,291 +330,540 @@ export default function TaskDetailPanel({
 
   return (
     <Card className="flex h-full flex-col gap-4 border border-slate-800/60 bg-slate-950/70">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-800/60 pb-4">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Detalles</p>
-          <h3 className="text-lg font-semibold text-white">{task.title}</h3>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-            <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
-            <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
-            {dueDate ? <span>Vence {new Intl.DateTimeFormat('es-ES').format(dueDate)}</span> : <span>Sin fecha límite</span>}
-          </div>
-        </div>
-        <Button size="xs" color="light" onClick={onClose}>
-          Cerrar
-        </Button>
-      </header>
+      <TaskHeader
+        task={task}
+        statusMeta={statusMeta}
+        priorityMeta={priorityMeta}
+        dueDate={dueDate}
+        viewerNames={viewerNames}
+        onClose={onClose}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Resumen</p>
-            <div className="space-y-3">
-              {[{ label: 'Autor', value: creator?.member_email ?? task.owner_email ?? 'Desconocido' },
-                { label: 'Última edición', value: updater?.member_email ?? task.updated_by ?? 'Sin registro' }].map((item) => (
-                  <div key={item.label} className="flex items-center gap-4 min-w-0">
-                    <span className="w-32 text-xs uppercase tracking-wide text-slate-500">{item.label}</span>
-                    <div className="min-w-0 flex-1 overflow-hidden text-right">
-                      <Tooltip content={item.value} placement="left" style="light" className="max-w-xs break-words">
-                        <span className="block truncate text-sm text-white">{item.value}</span>
-                      </Tooltip>
-                    </div>
-                  </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Responsable</p>
-            {members.length === 0 ? (
-              <p className="text-xs text-slate-500">Añade miembros al proyecto para poder asignar esta tarea.</p>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Select
-                  sizing="sm"
-                  value={task.assigned_to ?? ''}
-                  disabled={(isAssigned && !assigneeEditing) || assigneeSaving}
-                  className="w-full min-w-[12rem] sm:flex-1"
-                  onChange={handleAssigneeChange}
-                >
-                  <option value="">Sin asignar</option>
-                  {members.map((member) => (
-                    <option key={member.member_id} value={member.member_id}>
-                      {member.member_email ?? member.member_id} ({member.role})
-                    </option>
-                  ))}
-                </Select>
-                {isAssigned && !assigneeEditing ? (
-                  <Button
-                    size="xs"
-                    color="dark"
-                    pill
-                    className="w-full sm:w-auto"
-                    disabled={assigneeSaving}
-                    onClick={() => setAssigneeEditing(true)}
-                  >
-                    Cambiar responsable
-                  </Button>
-                ) : null}
-              </div>
-            )}
-            <p className="text-xs text-slate-400">
-              Actual: {assignee?.member_email ?? 'Sin asignar'}
-            </p>
-          </section>
-
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Prioridad</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Select
-                sizing="sm"
-                value={priority}
-                onChange={handlePriorityChange}
-                disabled={prioritySaving}
-                className="w-full min-w-[10rem] sm:flex-1"
-              >
-                <option value="high">Alta</option>
-                <option value="medium">Media</option>
-                <option value="low">Baja</option>
-              </Select>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>Impacto visual:</span>
-                <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Epic / Grupo</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <TextInput
-                type="text"
-                value={epicValue}
-                onChange={(event) => setEpicValue(event.target.value)}
-                onBlur={handleEpicSave}
-                placeholder="Ej. Onboarding, Infra, Marketing..."
-                maxLength={80}
-                disabled={epicSaving}
-                className="w-full min-w-[10rem] sm:flex-1"
-              />
-              <Button
-                size="xs"
-                color="light"
-                disabled={epicSaving}
-                onClick={handleEpicSave}
-                className="w-full sm:w-auto"
-              >
-                {epicSaving ? 'Guardando…' : 'Guardar epic'}
-              </Button>
-            </div>
-            <p className="text-xs text-slate-500">
-              Usa este campo para agrupar tareas relacionadas por iniciativa o área.
-            </p>
-          </section>
-
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Etiquetas</p>
-            {tags.length ? (
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/60 px-2 py-0.5 text-[11px] text-slate-100 hover:border-cyan-400 hover:text-cyan-100"
-                    onClick={() => handleRemoveTag(tag)}
-                    disabled={tagsSaving}
-                  >
-                    <span>#{tag}</span>
-                    <span className="text-slate-500">×</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">Aún no hay etiquetas. Añade algunas para clasificar esta tarea.</p>
-            )}
-            <form
-              className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center"
-              onSubmit={handleAddTag}
-            >
-              <TextInput
-                type="text"
-                placeholder="Añadir etiqueta (bug, frontend, infra...)"
-                value={newTag}
-                onChange={(event) => setNewTag(event.target.value)}
-                maxLength={32}
-                disabled={tagsSaving}
-              />
-              <Button
-                type="submit"
-                size="xs"
-                color="info"
-                disabled={tagsSaving || !newTag.trim()}
-              >
-                {tagsSaving ? 'Guardando…' : 'Añadir etiqueta'}
-              </Button>
-            </form>
-          </section>
-
-          <section className="space-y-2 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Cronología</p>
-            <ul className="space-y-2 text-xs text-slate-400">
-              {createdAt ? <li>Creada {formatRelativeTime(createdAt)}</li> : null}
-              {dueDate ? <li>Fecha límite {formatRelativeTime(dueDate)}</li> : null}
-              {completedAt ? <li>Completada {formatRelativeTime(completedAt)}</li> : null}
-            </ul>
-          </section>
+          <TaskSummarySection creator={creator} updater={updater} task={task} />
+          <TaskAssigneeSection
+            members={members}
+            task={task}
+            assignee={assignee}
+            isAssigned={isAssigned}
+            assigneeEditing={assigneeEditing}
+            assigneeSaving={assigneeSaving}
+            onAssigneeChange={handleAssigneeChange}
+            onStartEditing={() => setAssigneeEditing(true)}
+          />
+          <TaskPrioritySection
+            priority={priority}
+            priorityMeta={priorityMeta}
+            prioritySaving={prioritySaving}
+            onPriorityChange={handlePriorityChange}
+          />
+          <TaskEffortSection
+            effort={effort}
+            effortMeta={effortMeta}
+            onEffortChange={handleEffortChange}
+          />
+          <TaskEpicSection
+            epicValue={epicValue}
+            epicSaving={epicSaving}
+            onEpicChange={setEpicValue}
+            onEpicSave={handleEpicSave}
+          />
+          <TaskTagsSection
+            tags={tags}
+            newTag={newTag}
+            tagsSaving={tagsSaving}
+            onNewTagChange={setNewTag}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+          />
+          <TaskTimelineSection createdAt={createdAt} dueDate={dueDate} completedAt={completedAt} />
         </div>
 
         <div className="space-y-4">
-          <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Actividad</p>
-            <div className="space-y-2 text-slate-300">
-              <div>
-                <p className="text-xs text-slate-500">Última actividad</p>
-                <p className="text-sm text-white">
-                  {lastActivityLabel && lastActivityType ? `${lastActivityType} · ${lastActivityLabel}` : 'Sin actividad reciente registrada.'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Último comentario</p>
-                <p className="text-sm text-white">{lastCommentLabel ?? 'Sin comentarios recientes.'}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Subtareas</p>
-                <p className="text-xs text-slate-400">
-                  {subtasks.length ? `${completedSubtasks}/${subtasks.length} completadas` : 'Sin subtareas registradas.'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <Button
-                  size="xs"
-                  color="light"
-                  onClick={handleRefreshSubtasks}
-                  disabled={!onRefreshSubtasks || refreshingSubtasks || subtasksLoading}
-                >
-                  {subtasksLoading || refreshingSubtasks ? 'Actualizando…' : 'Refrescar'}
-                </Button>
-              </div>
-            </div>
-
-            {subtaskError ? <Alert color="failure">{subtaskError}</Alert> : null}
-            {subtasksLoading && !subtasks.length ? (
-              <div className="flex items-center gap-2 text-slate-400">
-                <Spinner size="sm" />
-                <span>Cargando subtareas…</span>
-              </div>
-            ) : null}
-
-            <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
-              {subtasks.length === 0 && !subtasksLoading ? (
-                <p className="text-xs text-slate-500">Añade la primera subtarea para esta tarea.</p>
-              ) : (
-                subtasks.map((subtask) => {
-                  const assigneeLabel = subtask.assigned_to
-                    ? membersById[subtask.assigned_to]?.member_email ?? subtask.assigned_to
-                    : null;
-                  const dueLabel = subtask.due_date
-                    ? new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(
-                        new Date(subtask.due_date)
-                      )
-                    : null;
-
-                  return (
-                    <div
-                      key={subtask.id}
-                      className="flex items-start gap-3 rounded-xl border border-slate-800/70 bg-slate-900/40 p-3"
-                    >
-                      <Checkbox
-                        checked={subtask.completed}
-                        onChange={() => handleToggleSubtask(subtask)}
-                        className="mt-1"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`text-sm font-medium ${
-                            subtask.completed ? 'text-slate-500 line-through' : 'text-white'
-                          }`}
-                        >
-                          {subtask.title}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
-                          {assigneeLabel ? <span>Responsable: {assigneeLabel}</span> : null}
-                          {dueLabel ? <span>Vence {dueLabel}</span> : null}
-                          {subtask.updated_at ? (
-                            <span>Actualizada {formatRelativeTime(new Date(subtask.updated_at))}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <Button size="xs" color="failure" pill onClick={() => handleDeleteSubtask(subtask.id)}>
-                        Eliminar
-                      </Button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <form className="space-y-2" onSubmit={handleCreateSubtask}>
-              <TextInput
-                type="text"
-                placeholder="Describe la subtarea"
-                value={newSubtask}
-                onChange={(event) => setNewSubtask(event.target.value)}
-                maxLength={120}
-                disabled={creatingSubtask}
-              />
-              <Button type="submit" size="sm" color="info" disabled={creatingSubtask || !newSubtask.trim()}>
-                {creatingSubtask ? 'Agregando…' : 'Agregar subtarea'}
-              </Button>
-            </form>
-          </section>
+          <TaskActivitySection
+            lastActivityLabel={lastActivityLabel}
+            lastActivityType={lastActivityType}
+            lastCommentLabel={lastCommentLabel}
+          />
+          <TaskSubtasksSection
+            subtasks={subtasks}
+            completedSubtasks={completedSubtasks}
+            subtasksLoading={subtasksLoading}
+            subtaskError={subtaskError}
+            canRefreshSubtasks={Boolean(onRefreshSubtasks)}
+            onRefreshClick={handleRefreshSubtasks}
+            refreshingSubtasks={refreshingSubtasks}
+            onToggleSubtask={handleToggleSubtask}
+            onDeleteSubtask={handleDeleteSubtask}
+            creatingSubtask={creatingSubtask}
+            newSubtask={newSubtask}
+            onNewSubtaskChange={setNewSubtask}
+            onCreateSubtask={handleCreateSubtask}
+            membersById={membersById}
+          />
+          {/* Comentarios y conversación alrededor de la tarea */}
+          <TaskComments
+            taskId={task.id}
+            taskTitle={task.title}
+            currentUserId={currentUserId}
+            members={members}
+            workspaceId={workspaceId}
+            projectId={projectId}
+          />
         </div>
       </div>
     </Card>
+  );
+}
+
+function TaskHeader({ task, statusMeta, priorityMeta, dueDate, viewerNames, onClose }) {
+  return (
+    <header className="flex items-start justify-between gap-4 border-b border-slate-800/60 pb-4">
+      <div className="space-y-1">
+        <p className="text-xs uppercase tracking-wide text-slate-500">Detalles</p>
+        <h3 className="text-lg font-semibold text-white">{task.title}</h3>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+          <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
+          {dueDate ? (
+            <span>Vence {new Intl.DateTimeFormat('es-ES').format(dueDate)}</span>
+          ) : (
+            <span>Sin fecha límite</span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-2">
+        {viewerNames.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span>
+              {viewerNames.length === 1
+                ? `${viewerNames[0]} está viendo esta tarea`
+                : viewerNames.length === 2
+                  ? `${viewerNames[0]} y ${viewerNames[1]} están viendo esta tarea`
+                  : `${viewerNames[0]}, ${viewerNames[1]} y ${viewerNames.length - 2} más están viendo esta tarea`}
+            </span>
+          </div>
+        ) : null}
+        <Button size="xs" color="light" onClick={onClose}>
+          Cerrar
+        </Button>
+      </div>
+    </header>
+  );
+}
+
+function TaskSummarySection({ creator, updater, task }) {
+  const items = [
+    { label: 'Autor', value: creator?.member_email ?? task.owner_email ?? 'Desconocido' },
+    { label: 'Última edición', value: updater?.member_email ?? task.updated_by ?? 'Sin registro' }
+  ];
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Resumen</p>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center gap-4 min-w-0">
+            <span className="w-32 text-xs uppercase tracking-wide text-slate-500">{item.label}</span>
+            <div className="min-w-0 flex-1 overflow-hidden text-right">
+              <Tooltip content={item.value} placement="left" style="light" className="max-w-xs break-words">
+                <span className="block truncate text-sm text-white">{item.value}</span>
+              </Tooltip>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TaskAssigneeSection({
+  members,
+  task,
+  assignee,
+  isAssigned,
+  assigneeEditing,
+  assigneeSaving,
+  onAssigneeChange,
+  onStartEditing
+}) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Responsable</p>
+      {members.length === 0 ? (
+        <p className="text-xs text-slate-500">Añade miembros al proyecto para poder asignar esta tarea.</p>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Select
+            sizing="sm"
+            value={task.assigned_to ?? ''}
+            disabled={(isAssigned && !assigneeEditing) || assigneeSaving}
+            className="w-full min-w-[12rem] sm:flex-1"
+            onChange={onAssigneeChange}
+          >
+            <option value="">Sin asignar</option>
+            {members.map((member) => (
+              <option key={member.member_id} value={member.member_id}>
+                {member.member_email ?? member.member_id} ({member.role})
+              </option>
+            ))}
+          </Select>
+          {isAssigned && !assigneeEditing ? (
+            <Button
+              size="xs"
+              color="dark"
+              pill
+              className="w-full sm:w-auto"
+              disabled={assigneeSaving}
+              onClick={onStartEditing}
+            >
+              Cambiar responsable
+            </Button>
+          ) : null}
+        </div>
+      )}
+      <p className="text-xs text-slate-400">
+        Actual: {assignee?.member_email ?? 'Sin asignar'}
+      </p>
+    </section>
+  );
+}
+
+function TaskPrioritySection({ priority, priorityMeta, prioritySaving, onPriorityChange }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Prioridad</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Select
+          sizing="sm"
+          value={priority}
+          onChange={onPriorityChange}
+          disabled={prioritySaving}
+          className="w-full min-w-[10rem] sm:flex-1"
+        >
+          <option value="high">Alta</option>
+          <option value="medium">Media</option>
+          <option value="low">Baja</option>
+        </Select>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span>Impacto visual:</span>
+          <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TaskEffortSection({ effort, effortMeta, onEffortChange }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Esfuerzo</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Select
+          sizing="sm"
+          value={effort}
+          onChange={onEffortChange}
+          className="w-full min-w-[10rem] sm:flex-1"
+        >
+          <option value="s">S (pequeño)</option>
+          <option value="m">M (medio)</option>
+          <option value="l">L (grande)</option>
+        </Select>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span>Estimación de tamaño:</span>
+          <Badge color={effortMeta.color}>{effortMeta.label}</Badge>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TaskEpicSection({ epicValue, epicSaving, onEpicChange, onEpicSave }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Epic / Grupo</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TextInput
+          type="text"
+          value={epicValue}
+          onChange={(event) => onEpicChange(event.target.value)}
+          onBlur={onEpicSave}
+          placeholder="Ej. Onboarding, Infra, Marketing..."
+          maxLength={80}
+          disabled={epicSaving}
+          className="w-full min-w-[10rem] sm:flex-1"
+        />
+        <Button
+          size="xs"
+          color="light"
+          disabled={epicSaving}
+          onClick={onEpicSave}
+          className="w-full sm:w-auto"
+        >
+          {epicSaving ? 'Guardando…' : 'Guardar epic'}
+        </Button>
+      </div>
+      <p className="text-xs text-slate-500">
+        Usa este campo para agrupar tareas relacionadas por iniciativa o área.
+      </p>
+    </section>
+  );
+}
+
+function TaskTagsSection({ tags, newTag, tagsSaving, onNewTagChange, onAddTag, onRemoveTag }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Etiquetas</p>
+      {tags.length ? (
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/60 px-2 py-0.5 text-[11px] text-slate-100 hover:border-cyan-400 hover:text-cyan-100"
+              onClick={() => onRemoveTag(tag)}
+              disabled={tagsSaving}
+            >
+              <span>#{tag}</span>
+              <span className="text-slate-500">×</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">Aún no hay etiquetas. Añade algunas para clasificar esta tarea.</p>
+      )}
+      <form
+        className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center"
+        onSubmit={onAddTag}
+      >
+        <TextInput
+          type="text"
+          placeholder="Añadir etiqueta (bug, frontend, infra...)"
+          value={newTag}
+          onChange={(event) => onNewTagChange(event.target.value)}
+          maxLength={32}
+          disabled={tagsSaving}
+        />
+        <Button
+          type="submit"
+          size="xs"
+          color="info"
+          disabled={tagsSaving || !newTag.trim()}
+        >
+          {tagsSaving ? 'Guardando…' : 'Añadir etiqueta'}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+function TaskTimelineSection({ createdAt, dueDate, completedAt }) {
+  return (
+    <section className="space-y-2 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Cronología</p>
+      <ul className="space-y-2 text-xs text-slate-400">
+        {createdAt ? <li>Creada {formatRelativeTime(createdAt)}</li> : null}
+        {dueDate ? <li>Fecha límite {formatRelativeTime(dueDate)}</li> : null}
+        {completedAt ? <li>Completada {formatRelativeTime(completedAt)}</li> : null}
+      </ul>
+    </section>
+  );
+}
+
+function TaskActivitySection({ lastActivityLabel, lastActivityType, lastCommentLabel }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <p className="text-xs uppercase tracking-wide text-slate-500">Actividad</p>
+      <div className="space-y-2 text-slate-300">
+        <div>
+          <p className="text-xs text-slate-500">Última actividad</p>
+          <p className="text-sm text-white">
+            {lastActivityLabel && lastActivityType
+              ? `${lastActivityType} · ${lastActivityLabel}`
+              : 'Sin actividad reciente registrada.'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Último comentario</p>
+          <p className="text-sm text-white">{lastCommentLabel ?? 'Sin comentarios recientes.'}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TaskSubtasksSection({
+  subtasks,
+  completedSubtasks,
+  subtasksLoading,
+  subtaskError,
+  canRefreshSubtasks,
+  onRefreshClick,
+  refreshingSubtasks,
+  onToggleSubtask,
+  onDeleteSubtask,
+  creatingSubtask,
+  newSubtask,
+  onNewSubtaskChange,
+  onCreateSubtask,
+  membersById
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <SubtasksHeader
+        subtasks={subtasks}
+        completedSubtasks={completedSubtasks}
+        subtasksLoading={subtasksLoading}
+        canRefreshSubtasks={canRefreshSubtasks}
+        onRefreshClick={onRefreshClick}
+        refreshingSubtasks={refreshingSubtasks}
+      />
+
+      {/* Subtareas sencillas pero útiles para romper trabajo grande en piezas manejables */}
+      <SubtasksList
+        subtasks={subtasks}
+        subtasksLoading={subtasksLoading}
+        subtaskError={subtaskError}
+        membersById={membersById}
+        onToggleSubtask={onToggleSubtask}
+        onDeleteSubtask={onDeleteSubtask}
+      />
+
+      <SubtaskCreateForm
+        creatingSubtask={creatingSubtask}
+        newSubtask={newSubtask}
+        onNewSubtaskChange={onNewSubtaskChange}
+        onCreateSubtask={onCreateSubtask}
+      />
+    </section>
+  );
+}
+
+function SubtasksHeader({
+  subtasks,
+  completedSubtasks,
+  subtasksLoading,
+  canRefreshSubtasks,
+  onRefreshClick,
+  refreshingSubtasks
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p className="text-xs uppercase tracking-wide text-slate-500">Subtareas</p>
+        <p className="text-xs text-slate-400">
+          {subtasks.length
+            ? `${completedSubtasks}/${subtasks.length} completadas`
+            : 'Sin subtareas registradas.'}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 text-xs">
+        <Button
+          size="xs"
+          color="light"
+          onClick={canRefreshSubtasks ? onRefreshClick : undefined}
+          disabled={!canRefreshSubtasks || refreshingSubtasks || subtasksLoading}
+        >
+          {subtasksLoading || refreshingSubtasks ? 'Actualizando…' : 'Refrescar'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SubtasksList({
+  subtasks,
+  subtasksLoading,
+  subtaskError,
+  membersById,
+  onToggleSubtask,
+  onDeleteSubtask
+}) {
+  return (
+    <>
+      {subtaskError ? <Alert color="failure">{subtaskError}</Alert> : null}
+      {subtasksLoading && !subtasks.length ? (
+        <div className="flex items-center gap-2 text-slate-400">
+          <Spinner size="sm" />
+          <span>Cargando subtareas…</span>
+        </div>
+      ) : null}
+
+      <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
+        {subtasks.length === 0 && !subtasksLoading ? (
+          <p className="text-xs text-slate-500">Añade la primera subtarea para esta tarea.</p>
+        ) : (
+          subtasks.map((subtask) => (
+            <SubtaskItem
+              key={subtask.id}
+              subtask={subtask}
+              membersById={membersById}
+              onToggleSubtask={onToggleSubtask}
+              onDeleteSubtask={onDeleteSubtask}
+            />
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+
+function SubtaskItem({ subtask, membersById, onToggleSubtask, onDeleteSubtask }) {
+  const assigneeLabel = subtask.assigned_to
+    ? membersById[subtask.assigned_to]?.member_email ?? subtask.assigned_to
+    : null;
+  const dueLabel = subtask.due_date
+    ? new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(
+        new Date(subtask.due_date)
+      )
+    : null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-slate-800/70 bg-slate-900/40 p-3">
+      <Checkbox
+        checked={subtask.completed}
+        onChange={() => onToggleSubtask(subtask)}
+        className="mt-1"
+      />
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm font-medium ${
+            subtask.completed ? 'text-slate-500 line-through' : 'text-white'
+          }`}
+        >
+          {subtask.title}
+        </p>
+        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
+          {assigneeLabel ? <span>Responsable: {assigneeLabel}</span> : null}
+          {dueLabel ? <span>Vence {dueLabel}</span> : null}
+          {subtask.updated_at ? (
+            <span>Actualizada {formatRelativeTime(new Date(subtask.updated_at))}</span>
+          ) : null}
+        </div>
+      </div>
+      <Button size="xs" color="failure" pill onClick={() => onDeleteSubtask(subtask.id)}>
+        Eliminar
+      </Button>
+    </div>
+  );
+}
+
+function SubtaskCreateForm({ creatingSubtask, newSubtask, onNewSubtaskChange, onCreateSubtask }) {
+  return (
+    <form className="space-y-2" onSubmit={onCreateSubtask}>
+      <TextInput
+        type="text"
+        placeholder="Describe la subtarea"
+        value={newSubtask}
+        onChange={(event) => onNewSubtaskChange(event.target.value)}
+        maxLength={120}
+        disabled={creatingSubtask}
+      />
+      <Button type="submit" size="sm" color="info" disabled={creatingSubtask || !newSubtask.trim()}>
+        {creatingSubtask ? 'Agregando…' : 'Agregar subtarea'}
+      </Button>
+    </form>
   );
 }
