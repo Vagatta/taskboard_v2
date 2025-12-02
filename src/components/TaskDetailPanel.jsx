@@ -468,7 +468,7 @@ function TaskSummarySection({ creator, updater, task }) {
           <div key={item.label} className="flex items-center gap-4 min-w-0">
             <span className="w-32 text-xs uppercase tracking-wide text-slate-500">{item.label}</span>
             <div className="min-w-0 flex-1 overflow-hidden text-right">
-              <Tooltip content={item.value} placement="left" style="light" className="max-w-xs break-words">
+              <Tooltip content={item.value} placement="left" style={{}} className="max-w-xs break-words">
                 <span className="block truncate text-sm text-white">{item.value}</span>
               </Tooltip>
             </div>

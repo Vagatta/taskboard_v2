@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Avatar, Badge, Button, Card, Checkbox, Label, Spinner, TextInput, Tooltip } from 'flowbite-react';
+import { Alert, Avatar, Badge, Button, Card, Checkbox, Label, TextInput, Tooltip } from 'flowbite-react';
 import { useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import UserStatCard from './UserStatCard';

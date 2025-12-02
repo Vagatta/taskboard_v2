@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TabItem, Tabs, TextInput } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TabItem, Tabs } from 'flowbite-react';
 import ActivityLog from './components/ActivityLog';
 import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
@@ -105,33 +105,7 @@ const TaskList = forwardRef(function TaskList(
     [projectId, userId]
   );
 
-  const updateTaskEffort = useCallback(
-    async (task, nextEffort) => {
-      if (!nextEffort || !projectId) {
-        return;
-      }
-
-      setErrorMessage('');
-
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({ effort: nextEffort, updated_by: userId })
-        .eq('id', task.id)
-        .eq('project_id', projectId)
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        setErrorMessage(error.message);
-        return;
-      }
-
-      if (data) {
-        setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
-      }
-    },
-    [projectId, userId]
-  );
+  // Nota: la actualización de esfuerzo de la tarea se realiza desde TaskDetailPanel mediante callbacks específicos.
 
   const updateTaskEpic = useCallback(
     async (task, nextEpicRaw) => {
@@ -561,7 +535,7 @@ const TaskList = forwardRef(function TaskList(
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return today;
-  }, [projectId, tasks.length]);
+  }, []);
 
   const timelineDays = useMemo(() => {
     return Array.from({ length: 14 }, (_, index) => {
@@ -1188,7 +1162,7 @@ const TaskList = forwardRef(function TaskList(
 
       setAssigningTaskId(null);
     },
-    [membersById, projectId, setAssigneeEditTaskId, userId]
+    [membersById, projectId, userId]
   );
 
   const handleBulkUpdateCompletion = useCallback(
@@ -1475,7 +1449,6 @@ const TaskList = forwardRef(function TaskList(
                   const subtaskCount = subtaskMeta[task.id];
                   const subtaskTotal = subtaskCount?.total ?? 0;
                   const subtaskCompleted = subtaskCount?.completed ?? 0;
-                  const subtaskProgress = subtaskTotal > 0 ? Math.round((subtaskCompleted / subtaskTotal) * 100) : 0;
                   const isHighPriority = task.priority === 'high';
                   const tags = Array.isArray(task.tags) ? task.tags : [];
 
@@ -2084,274 +2057,21 @@ const TaskList = forwardRef(function TaskList(
       taskActivityMeta,
       taskCommentMeta,
       toggleTaskCompletion,
-      updateTaskAssignee
-    ]
-  );
-
-  const renderModeContent = useCallback(
-    (mode) => {
-      if (!projectId) {
-        return (
-          <Card>
-            <p className="text-sm text-slate-500">Selecciona un proyecto para ver sus tareas.</p>
-          </Card>
-        );
-      }
-
-      if (errorMessage) {
-        return (
-          <Alert color="failure" className="w-full">
-            {errorMessage}
-          </Alert>
-        );
-      }
-
-      if (loading && tasks.length === 0) {
-        return (
-          <div className="flex justify-center py-12">
-            <Spinner size="lg" />
-          </div>
-        );
-      }
-
-      if (isEmpty) {
-        return (
-          <Card>
-            <p className="text-sm text-slate-500">
-              Aún no hay tareas en este proyecto. Crea la primera usando el formulario superior.
-            </p>
-          </Card>
-        );
-      }
-
-      if (isFilteredEmpty) {
-        return (
-          <Card>
-            <p className="text-sm text-slate-500">
-              Ninguna tarea coincide con los filtros seleccionados. Ajusta los filtros para ver más resultados.
-            </p>
-          </Card>
-        );
-      }
-
-      if (mode === 'timeline') {
-        const bucketConfigs = [
-          { title: 'Atrasadas', tasks: timelineBuckets.overdue, empty: 'Sin tareas atrasadas.' },
-          { title: 'Sin fecha límite', tasks: timelineBuckets.undated, empty: 'Todas las tareas tienen fecha.' },
-          { title: 'Más adelante', tasks: timelineBuckets.later, empty: 'Nada planificado más allá de dos semanas.' }
-        ];
-
-        const renderTaskChip = (task) => {
-          const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
-          const dueDate = task.due_date ? new Date(task.due_date) : null;
-          const isSelected = selectedTaskDetail?.id === task.id;
-          const priority = task.priority ?? 'medium';
-          const priorityLabel = priority === 'high' ? 'Alta' : priority === 'low' ? 'Baja' : 'Media';
-          const effort = task.effort ?? 'm';
-          const effortLabel = effort === 's' ? 'S' : effort === 'l' ? 'L' : 'M';
-          const isHighPriority = priority === 'high';
-          const subMeta = subtaskMeta[task.id];
-          const subTotal = subMeta?.total ?? 0;
-          const subCompleted = subMeta?.completed ?? 0;
-          const subProgress = subTotal > 0 ? Math.round((subCompleted / subTotal) * 100) : 0;
-          const tags = Array.isArray(task.tags) ? task.tags : [];
-
-          return (
-            <div
-              key={task.id}
-              className={`mr-1 w-full overflow-hidden rounded-xl border p-3 text-left transition ${
-                isSelected
-                  ? 'border-cyan-400 bg-cyan-500/10 hover:border-cyan-400 hover:bg-cyan-500/20'
-                  : isHighPriority
-                    ? 'border-fuchsia-500/80 bg-fuchsia-500/5 hover:border-fuchsia-400 hover:bg-fuchsia-500/10'
-                    : 'border-slate-800 bg-slate-900/60 hover:border-cyan-400 hover:bg-cyan-500/5'
-              }`}
-              onClick={() => setSelectedTaskDetail(task)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <p
-                  className={`max-w-[10rem] text-sm font-semibold leading-snug ${
-                    task.completed ? 'text-slate-400 line-through' : 'text-white'
-                  }`}
-                >
-                  {task.title}
-                </p>
-                <button
-                  type="button"
-                  className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-600 text-[10px] text-slate-400 transition hover:border-emerald-300"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleTaskCompletion(task);
-                  }}
-                >
-                  <span className="sr-only">
-                    {task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
-                  </span>
-                  <span className={task.completed ? 'text-emerald-300' : 'text-transparent'}>✓</span>
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">
-                {dueDate ? timelineTimeFormatter.format(dueDate) : 'Todo el día'} · {assigneeMember?.member_email ?? 'Sin asignar'}
-                {` · Prioridad: ${priorityLabel}`}
-                {` · Esfuerzo: ${effortLabel}`}
-                {subtaskMeta[task.id]
-                  ? ` · ${subtaskMeta[task.id].completed}/${subtaskMeta[task.id].total} subtareas`
-                  : ''}
-              </p>
-              {tags.length > 0 ? (
-                <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-200">
-                  {tags.slice(0, 3).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-slate-900/80 px-2 py-0.5"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                  {tags.length > 3 ? (
-                    <span className="text-slate-500">+{tags.length - 3} más</span>
-                  ) : null}
-                </div>
-              ) : null}
-              {subtaskMeta[task.id] ? (
-                <div className="mt-1 h-1 w-full rounded-full bg-slate-800">
-                  <div
-                    className="h-1 rounded-full bg-emerald-400"
-                    style={{ width: `${(subtaskMeta[task.id].completed / subtaskMeta[task.id].total) * 100}%` }}
-                  />
-                </div>
-              ) : null}
-            </div>
-          );
-        };
-
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              {timelineWeeks.map((week, weekIndex) => (
-                <div key={`week-${weekIndex}`} className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-                  {week.map((day, dayIndex) => {
-                    const absoluteIndex = weekIndex * 7 + dayIndex;
-                    const key = timelineDayKeys[absoluteIndex];
-                    const dayTasks = timelineBuckets.dayMap[key] ?? [];
-                    const isToday = key === timelineDayKeys[0];
-                    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                    const tasksToShow = dayTasks.slice(0, 3);
-                    const remainingTasks = dayTasks.length - tasksToShow.length;
-
-                    return (
-                      <div
-                        key={key}
-                        className={`rounded-2xl border px-3 py-3 overflow-hidden ${
-                          isToday ? 'border-cyan-500/70 bg-cyan-500/5' : 'border-slate-800 bg-slate-950/40'
-                        } ${isWeekend ? 'opacity-80' : ''}`}
-                      >
-                        <div className="flex items-center justify-between text-xs text-slate-400">
-                          <span className="font-semibold text-white">{timelineDayFormatter.format(day)}</span>
-                          <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
-                        </div>
-                        <div className="mt-3 space-y-2">
-                          {dayTasks.length === 0 ? (
-                            <p className="text-xs text-slate-500">Sin tareas.</p>
-                          ) : (
-                            <>
-                              {tasksToShow.map((task) => renderTaskChip(task))}
-                              {remainingTasks > 0 ? (
-                                <button
-                                  type="button"
-                                  className="w-full rounded-lg border border-dashed border-slate-700 py-1 text-xs text-slate-400 hover:border-cyan-400"
-                                  onClick={() => {
-                                    const targetTask = dayTasks[0];
-                                    if (targetTask) {
-                                      setSelectedTaskDetail(targetTask);
-                                    }
-                                  }}
-                                >
-                                  + {remainingTasks} tarea{remainingTasks > 1 ? 's' : ''} más
-                                </button>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              {bucketConfigs.map((bucket) => (
-                <div key={bucket.title} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="font-semibold text-white">{bucket.title}</span>
-                    <Badge color={bucket.tasks.length ? 'warning' : 'gray'}>{bucket.tasks.length}</Badge>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {bucket.tasks.length === 0 ? (
-                      <p className="text-xs text-slate-500">{bucket.empty}</p>
-                    ) : (
-                      bucket.tasks.map((task) => renderTaskChip(task))
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-
-      if (mode === 'sections') {
-        return (
-          <TaskSectionsBoard
-            sections={boardSections}
-            sectionsGrouping={sectionsGrouping}
-            onChangeSectionsGrouping={setSectionsGrouping}
-            membersById={membersById}
-            onToggleTaskCompletion={toggleTaskCompletion}
-            onSelectTask={setSelectedTaskDetail}
-            onFocusNewTaskInput={() => newTaskInputRef.current?.focus()}
-          />
-        );
-      }
-
-      if (mode === 'kanban') {
-        return <TaskKanbanBoard columns={kanbanColumns} renderTaskCard={renderTaskCard} />;
-      }
-
-      // Vista lista por defecto
-      return <div className="space-y-4">{filteredTasks.map((task) => renderTaskCard(task))}</div>;
-    },
-    [
-      errorMessage,
-      filteredTasks,
-      isEmpty,
-      isFilteredEmpty,
-      kanbanColumns,
-      loading,
-      membersById,
-      projectId,
-      renderTaskCard,
-      selectedTaskDetail?.id,
-      subtaskMeta,
-      timelineBuckets,
-      timelineDayFormatter,
-      timelineDayKeys,
-      timelineDays,
-      timelineWeeks,
-      timelineTimeFormatter,
-      toggleTaskCompletion,
-      tasks.length
+      updateTaskAssignee,
+      madridDateFormatter
     ]
   );
 
   useEffect(() => {
-    if (typeof onTaskSummaryChange === 'function') {
-      onTaskSummaryChange({
-        total: totalTasks,
-        pending: pendingCount,
-        completed: completedCount
-      });
+    if (!onTaskSummaryChange) {
+      return;
     }
+
+    onTaskSummaryChange({
+      total: totalTasks,
+      pending: pendingCount,
+      completed: completedCount
+    });
   }, [completedCount, onTaskSummaryChange, pendingCount, totalTasks]);
 
   useEffect(() => {

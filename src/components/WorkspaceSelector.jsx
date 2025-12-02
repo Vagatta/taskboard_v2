@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Select, Spinner, TextInput } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Select, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 
 // Selector de workspaces: lista espacios, permite crear nuevos e invitar gente.

@@ -207,8 +207,6 @@ export default function ActivityLog({ projectId, members = [] }) {
     return String(log.details);
   };
 
-  const currentPreset = RANGE_PRESETS.find((preset) => preset.value === rangeDays)?.value ?? 'custom';
-
   let content;
 
   if (loading) {
