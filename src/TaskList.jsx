@@ -1447,8 +1447,6 @@ const TaskList = forwardRef(function TaskList(
                   const isOverdue = Boolean(dueDate && !task.completed && dueDate.getTime() < now);
                   const isSelected = selectedTaskDetail?.id === task.id;
                   const subtaskCount = subtaskMeta[task.id];
-                  const subtaskTotal = subtaskCount?.total ?? 0;
-                  const subtaskCompleted = subtaskCount?.completed ?? 0;
                   const isHighPriority = task.priority === 'high';
                   const tags = Array.isArray(task.tags) ? task.tags : [];
 
@@ -2085,6 +2083,116 @@ const TaskList = forwardRef(function TaskList(
       setSelectedTaskDetail(null);
     }
   }, [selectedTaskDetail, tasks]);
+
+  const renderModeContent = (mode) => {
+    if (!projectId) {
+      return null;
+    }
+
+    if (mode === 'kanban') {
+      return <TaskKanbanBoard columns={kanbanColumns} renderTaskCard={renderTaskCard} />;
+    }
+
+    if (mode === 'timeline') {
+      const { dayMap, overdue, undated, later } = timelineBuckets;
+
+      const renderTaskChip = (task) => {
+        const dueDate = task.due_date ? new Date(task.due_date) : null;
+        const timeLabel = dueDate ? timelineTimeFormatter.format(dueDate) : null;
+
+        return (
+          <button
+            key={task.id}
+            type="button"
+            className="w-full rounded-xl border border-slate-800 bg-slate-900/50 p-2 text-left text-xs text-slate-200 hover:border-cyan-400 hover:bg-cyan-900/40"
+            onClick={() => setSelectedTaskDetail(task)}
+          >
+            {timeLabel ? <span className="mr-1 text-[10px] text-slate-400">{timeLabel}</span> : null}
+            <span className={task.completed ? 'line-through text-slate-400' : 'text-slate-100'}>{task.title}</span>
+          </button>
+        );
+      };
+
+      return (
+        <div className="space-y-4">
+          {overdue.length > 0 ? (
+            <Card className="bg-slate-950/40">
+              <div className="mb-2 text-xs font-semibold text-rose-200">Vencidas</div>
+              <div className="space-y-2">
+                {overdue.map((task) => renderTaskChip(task))}
+              </div>
+            </Card>
+          ) : null}
+
+          <div className="overflow-x-auto pb-2">
+            <div className="flex min-w-max gap-3">
+              {timelineDays.map((day) => {
+                const key = day.toISOString().split('T')[0];
+                const dayTasks = dayMap[key] ?? [];
+                return (
+                  <Card key={key} className="min-w-[180px] bg-slate-950/40">
+                    <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-semibold text-white">{timelineDayFormatter.format(day)}</span>
+                      <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {dayTasks.length === 0 ? (
+                        <p className="text-[11px] text-slate-500">Sin tareas para este día.</p>
+                      ) : (
+                        dayTasks.map((task) => renderTaskChip(task))
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {(later.length > 0 || undated.length > 0) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {later.length > 0 ? (
+                <Card className="bg-slate-950/40">
+                  <div className="mb-2 text-xs font-semibold text-slate-200">Más adelante</div>
+                  <div className="space-y-2">
+                    {later.map((task) => renderTaskChip(task))}
+                  </div>
+                </Card>
+              ) : null}
+              {undated.length > 0 ? (
+                <Card className="bg-slate-950/40">
+                  <div className="mb-2 text-xs font-semibold text-slate-200">Sin fecha</div>
+                  <div className="space-y-2">
+                    {undated.map((task) => renderTaskChip(task))}
+                  </div>
+                </Card>
+              ) : null}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (mode === 'sections') {
+      return (
+        <TaskSectionsBoard
+          sections={boardSections}
+          sectionsGrouping={sectionsGrouping}
+          onChangeSectionsGrouping={setSectionsGrouping}
+          membersById={membersById}
+          onToggleTaskCompletion={toggleTaskCompletion}
+          onSelectTask={setSelectedTaskDetail}
+          onFocusNewTaskInput={() => {
+            setShowCreatePanel(true);
+            requestAnimationFrame(() => {
+              newTaskInputRef.current?.focus?.();
+            });
+          }}
+        />
+      );
+    }
+
+    return null;
+  };
 
   const listContent = renderListView;
   const kanbanContent = renderModeContent('kanban');
