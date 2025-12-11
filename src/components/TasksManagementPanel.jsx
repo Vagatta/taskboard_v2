@@ -17,14 +17,14 @@ export default function TasksManagementPanel({
     <div className="space-y-6">
       {!selectedWorkspaceId ? (
         <div
-          className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400"
+          className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
           aria-live="polite"
         >
           Selecciona un workspace para ver tareas.
         </div>
       ) : projects.length === 0 ? (
         <div
-          className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400"
+          className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
           aria-live="polite"
         >
           Crea un proyecto antes de gestionar tareas.
@@ -43,7 +43,7 @@ export default function TasksManagementPanel({
         />
       ) : (
         <div
-          className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-400"
+          className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
           aria-live="polite"
         >
           Selecciona un proyecto para ver sus tareas.
@@ -52,3 +52,9 @@ export default function TasksManagementPanel({
     </div>
   );
 }
+
+
+
+
+
+

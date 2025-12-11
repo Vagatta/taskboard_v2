@@ -12,7 +12,7 @@ export default function TaskKanbanBoard({ columns, renderTaskCard, onMoveTask })
         {Object.entries(columns).map(([columnKey, columnTasks]) => (
           <Card
             key={columnKey}
-            className="bg-slate-950/40"
+            className="bg-slate-100 dark:bg-slate-950/60"
             onDragOver={(event) => {
               event.preventDefault();
             }}
@@ -24,8 +24,8 @@ export default function TaskKanbanBoard({ columns, renderTaskCard, onMoveTask })
               }
             }}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="font-semibold text-white">{kanbanMeta[columnKey].label}</span>
+            <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white">{kanbanMeta[columnKey].label}</span>
               <Badge color={kanbanMeta[columnKey].badgeColor}>{columnTasks.length}</Badge>
             </div>
             <div className="mt-4 space-y-4">
@@ -52,3 +52,7 @@ export default function TaskKanbanBoard({ columns, renderTaskCard, onMoveTask })
     </div>
   );
 }
+
+
+
+

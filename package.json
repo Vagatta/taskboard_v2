@@ -1,6 +1,7 @@
 {
   "name": "taskboard",
   "version": "0.1.0",
+  "homepage": "/Taskboard",
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.81.0",

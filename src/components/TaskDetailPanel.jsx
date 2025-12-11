@@ -40,6 +40,8 @@ export default function TaskDetailPanel({
   const [epicValue, setEpicValue] = useState(task?.epic ?? '');
   const [epicSaving, setEpicSaving] = useState(false);
   const [viewers, setViewers] = useState([]);
+  const [activeLeftTab, setActiveLeftTab] = useState('summary');
+  const [activeRightTab, setActiveRightTab] = useState('activity');
 
   useEffect(() => {
     if (!task) {
@@ -108,7 +110,7 @@ export default function TaskDetailPanel({
 
   if (!task) {
     return (
-      <Card className="border border-slate-800/60 bg-slate-950/40 text-sm text-slate-500">
+      <Card className="border border-slate-200 dark:border-slate-800/60 bg-slate-100 dark:bg-slate-950/10 text-sm text-slate-500">
         <p>Selecciona una tarea para ver sus detalles.</p>
       </Card>
     );
@@ -330,7 +332,7 @@ export default function TaskDetailPanel({
   };
 
   return (
-    <Card className="flex h-full flex-col gap-4 border border-slate-800/60 bg-slate-950/70">
+    <Card className="flex h-full flex-col gap-4 border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10">
       <TaskHeader
         task={task}
         statusMeta={statusMeta}
@@ -341,11 +343,11 @@ export default function TaskDetailPanel({
       />
 
       {onToggleCompletion ? (
-        <div className="flex items-center justify-between rounded-2xl border border-slate-800/60 bg-slate-950/60 px-4 py-2 text-xs text-slate-300">
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-slate-100 dark:bg-slate-950/10 shadow-none px-4 py-2 text-xs text-slate-700 dark:text-slate-300">
           <span>
             Estado actual:
             {' '}
-            <span className={task.completed ? 'text-emerald-300' : 'text-amber-200'}>
+            <span className={task.completed ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-200'}>
               {task.completed ? 'Completada' : 'Pendiente'}
             </span>
           </span>
@@ -361,104 +363,192 @@ export default function TaskDetailPanel({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <Tabs aria-label="Resumen y propiedades de la tarea" variant="underline">
-            <TabItem title="Resumen" active>
-              <div className="mt-2 space-y-4">
-                <TaskSummarySection creator={creator} updater={updater} task={task} />
-                <TaskTimelineSection createdAt={createdAt} dueDate={dueDate} completedAt={completedAt} />
-              </div>
-            </TabItem>
-            <TabItem title="Responsable">
-              <div className="mt-2 space-y-4">
-                <TaskAssigneeSection
-                  members={members}
-                  task={task}
-                  assignee={assignee}
-                  isAssigned={isAssigned}
-                  assigneeEditing={assigneeEditing}
-                  assigneeSaving={assigneeSaving}
-                  onAssigneeChange={handleAssigneeChange}
-                  onStartEditing={() => setAssigneeEditing(true)}
-                />
-              </div>
-            </TabItem>
-            <TabItem title="Propiedades">
-              <div className="mt-2 space-y-4">
-                <TaskPrioritySection
-                  priority={priority}
-                  priorityMeta={priorityMeta}
-                  prioritySaving={prioritySaving}
-                  onPriorityChange={handlePriorityChange}
-                />
-                <TaskEffortSection
-                  effort={effort}
-                  effortMeta={effortMeta}
-                  onEffortChange={handleEffortChange}
-                />
-                <TaskEpicSection
-                  epicValue={epicValue}
-                  epicSaving={epicSaving}
-                  onEpicChange={setEpicValue}
-                  onEpicSave={handleEpicSave}
-                />
-                <TaskTagsSection
-                  tags={tags}
-                  newTag={newTag}
-                  tagsSaving={tagsSaving}
-                  onNewTagChange={setNewTag}
-                  onAddTag={handleAddTag}
-                  onRemoveTag={handleRemoveTag}
-                />
-              </div>
-            </TabItem>
-          </Tabs>
+          <div className="rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-950/30 p-2">
+            <nav className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+              {[
+                {
+                  id: 'summary', label: 'Resumen', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'assignee', label: 'Responsable', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'properties', label: 'Propiedades', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                    </svg>
+                  )
+                }
+              ].map((tab) => {
+                const isActive = activeLeftTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveLeftTab(tab.id)}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${isActive
+                      ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                      : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                      }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="animate-in fade-in slide-in-from-left-1 duration-200">
+              {activeLeftTab === 'summary' && (
+                <div className="space-y-4">
+                  <TaskSummarySection creator={creator} updater={updater} task={task} />
+                  <TaskTimelineSection createdAt={createdAt} dueDate={dueDate} completedAt={completedAt} />
+                </div>
+              )}
+              {activeLeftTab === 'assignee' && (
+                <div className="space-y-4">
+                  <TaskAssigneeSection
+                    members={members}
+                    task={task}
+                    assignee={assignee}
+                    isAssigned={isAssigned}
+                    assigneeEditing={assigneeEditing}
+                    assigneeSaving={assigneeSaving}
+                    onAssigneeChange={handleAssigneeChange}
+                    onStartEditing={() => setAssigneeEditing(true)}
+                  />
+                </div>
+              )}
+              {activeLeftTab === 'properties' && (
+                <div className="space-y-4">
+                  <TaskPrioritySection
+                    priority={priority}
+                    priorityMeta={priorityMeta}
+                    prioritySaving={prioritySaving}
+                    onPriorityChange={handlePriorityChange}
+                  />
+                  <TaskEffortSection
+                    effort={effort}
+                    effortMeta={effortMeta}
+                    onEffortChange={handleEffortChange}
+                  />
+                  <TaskEpicSection
+                    epicValue={epicValue}
+                    epicSaving={epicSaving}
+                    onEpicChange={setEpicValue}
+                    onEpicSave={handleEpicSave}
+                  />
+                  <TaskTagsSection
+                    tags={tags}
+                    newTag={newTag}
+                    tagsSaving={tagsSaving}
+                    onNewTagChange={setNewTag}
+                    onAddTag={handleAddTag}
+                    onRemoveTag={handleRemoveTag}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="space-y-4">
-          <Tabs aria-label="Detalles avanzados de la tarea" variant="underline">
-            <TabItem title="Actividad" active>
-              <div className="mt-2 space-y-4">
-                <TaskActivitySection
-                  lastActivityLabel={lastActivityLabel}
-                  lastActivityType={lastActivityType}
-                  lastCommentLabel={lastCommentLabel}
-                />
-              </div>
-            </TabItem>
-            <TabItem title="Subtareas">
-              <div className="mt-2 space-y-4">
-                <TaskSubtasksSection
-                  subtasks={subtasks}
-                  completedSubtasks={completedSubtasks}
-                  subtasksLoading={subtasksLoading}
-                  subtaskError={subtaskError}
-                  canRefreshSubtasks={Boolean(onRefreshSubtasks)}
-                  onRefreshClick={handleRefreshSubtasks}
-                  refreshingSubtasks={refreshingSubtasks}
-                  onToggleSubtask={handleToggleSubtask}
-                  onDeleteSubtask={handleDeleteSubtask}
-                  creatingSubtask={creatingSubtask}
-                  newSubtask={newSubtask}
-                  onNewSubtaskChange={setNewSubtask}
-                  onCreateSubtask={handleCreateSubtask}
-                  membersById={membersById}
-                />
-              </div>
-            </TabItem>
-            <TabItem title="Comentarios">
-              <div className="mt-2 space-y-4">
-                {/* Comentarios y conversación alrededor de la tarea */}
-                <TaskComments
-                  taskId={task.id}
-                  taskTitle={task.title}
-                  currentUserId={currentUserId}
-                  members={members}
-                  workspaceId={workspaceId}
-                  projectId={projectId}
-                />
-              </div>
-            </TabItem>
-          </Tabs>
+          <div className="rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-950/30 p-2">
+            <nav className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+              {[
+                {
+                  id: 'activity', label: 'Actividad', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'subtasks', label: 'Subtareas', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75Zm0 5.25h.008v.008H3.75V12Zm0 5.25h.008v.008H3.75v-.008Z" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'comments', label: 'Comentarios', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+                    </svg>
+                  )
+                }
+              ].map((tab) => {
+                const isActive = activeRightTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveRightTab(tab.id)}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${isActive
+                      ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                      : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                      }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="animate-in fade-in slide-in-from-left-1 duration-200">
+              {activeRightTab === 'activity' && (
+                <div className="space-y-4">
+                  <TaskActivitySection
+                    lastActivityLabel={lastActivityLabel}
+                    lastActivityType={lastActivityType}
+                    lastCommentLabel={lastCommentLabel}
+                  />
+                </div>
+              )}
+              {activeRightTab === 'subtasks' && (
+                <div className="space-y-4">
+                  <TaskSubtasksSection
+                    subtasks={subtasks}
+                    completedSubtasks={completedSubtasks}
+                    subtasksLoading={subtasksLoading}
+                    subtaskError={subtaskError}
+                    canRefreshSubtasks={Boolean(onRefreshSubtasks)}
+                    onRefreshClick={handleRefreshSubtasks}
+                    refreshingSubtasks={refreshingSubtasks}
+                    onToggleSubtask={handleToggleSubtask}
+                    onDeleteSubtask={handleDeleteSubtask}
+                    creatingSubtask={creatingSubtask}
+                    newSubtask={newSubtask}
+                    onNewSubtaskChange={setNewSubtask}
+                    onCreateSubtask={handleCreateSubtask}
+                    membersById={membersById}
+                  />
+                </div>
+              )}
+              {activeRightTab === 'comments' && (
+                <div className="space-y-4">
+                  {/* Comentarios y conversación alrededor de la tarea */}
+                  <TaskComments
+                    taskId={task.id}
+                    taskTitle={task.title}
+                    currentUserId={currentUserId}
+                    members={members}
+                    workspaceId={workspaceId}
+                    projectId={projectId}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </Card>
@@ -470,8 +560,8 @@ function TaskHeader({ task, statusMeta, priorityMeta, dueDate, viewerNames, onCl
     <header className="flex items-start justify-between gap-4 border-b border-slate-800/60 pb-4">
       <div className="space-y-1">
         <p className="text-xs uppercase tracking-wide text-slate-500">Detalles</p>
-        <h3 className="text-lg font-semibold text-white">{task.title}</h3>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{task.title}</h3>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
           <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
           {dueDate ? (
@@ -483,7 +573,7 @@ function TaskHeader({ task, statusMeta, priorityMeta, dueDate, viewerNames, onCl
       </div>
       <div className="flex flex-col items-end gap-2">
         {viewerNames.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-emerald-300">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-emerald-700 dark:text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span>
               {viewerNames.length === 1
@@ -509,7 +599,7 @@ function TaskSummarySection({ creator, updater, task }) {
   ];
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Resumen</p>
       <div className="space-y-3">
         {items.map((item) => (
@@ -517,7 +607,7 @@ function TaskSummarySection({ creator, updater, task }) {
             <span className="w-32 text-xs uppercase tracking-wide text-slate-500">{item.label}</span>
             <div className="min-w-0 flex-1 overflow-hidden text-right">
               <Tooltip content={item.value} placement="left" style={{}} className="max-w-xs break-words">
-                <span className="block truncate text-sm text-white">{item.value}</span>
+                <span className="block truncate text-sm text-slate-900 dark:text-white">{item.value}</span>
               </Tooltip>
             </div>
           </div>
@@ -538,7 +628,7 @@ function TaskAssigneeSection({
   onStartEditing
 }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Responsable</p>
       {members.length === 0 ? (
         <p className="text-xs text-slate-500">Añade miembros al proyecto para poder asignar esta tarea.</p>
@@ -572,7 +662,7 @@ function TaskAssigneeSection({
           ) : null}
         </div>
       )}
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-600 dark:text-slate-400">
         Actual: {assignee?.member_email ?? 'Sin asignar'}
       </p>
     </section>
@@ -581,7 +671,7 @@ function TaskAssigneeSection({
 
 function TaskPrioritySection({ priority, priorityMeta, prioritySaving, onPriorityChange }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Prioridad</p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Select
@@ -595,7 +685,7 @@ function TaskPrioritySection({ priority, priorityMeta, prioritySaving, onPriorit
           <option value="medium">Media</option>
           <option value="low">Baja</option>
         </Select>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <span>Impacto visual:</span>
           <Badge color={priorityMeta.color}>{priorityMeta.label}</Badge>
         </div>
@@ -606,7 +696,7 @@ function TaskPrioritySection({ priority, priorityMeta, prioritySaving, onPriorit
 
 function TaskEffortSection({ effort, effortMeta, onEffortChange }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Esfuerzo</p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Select
@@ -619,7 +709,7 @@ function TaskEffortSection({ effort, effortMeta, onEffortChange }) {
           <option value="m">M (medio)</option>
           <option value="l">L (grande)</option>
         </Select>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <span>Estimación de tamaño:</span>
           <Badge color={effortMeta.color}>{effortMeta.label}</Badge>
         </div>
@@ -630,7 +720,7 @@ function TaskEffortSection({ effort, effortMeta, onEffortChange }) {
 
 function TaskEpicSection({ epicValue, epicSaving, onEpicChange, onEpicSave }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Epic / Grupo</p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <TextInput
@@ -662,7 +752,7 @@ function TaskEpicSection({ epicValue, epicSaving, onEpicChange, onEpicSave }) {
 
 function TaskTagsSection({ tags, newTag, tagsSaving, onNewTagChange, onAddTag, onRemoveTag }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Etiquetas</p>
       {tags.length ? (
         <div className="flex flex-wrap gap-2">
@@ -670,7 +760,7 @@ function TaskTagsSection({ tags, newTag, tagsSaving, onNewTagChange, onAddTag, o
             <button
               key={tag}
               type="button"
-              className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/60 px-2 py-0.5 text-[11px] text-slate-100 hover:border-cyan-400 hover:text-cyan-100"
+              className="flex items-center gap-1 rounded-full border border-slate-700 bg-white dark:bg-slate-900/10 px-2 py-0.5 text-[11px] text-slate-900 dark:text-slate-100 hover:border-cyan-400 hover:text-cyan-600 dark:hover:text-cyan-100"
               onClick={() => onRemoveTag(tag)}
               disabled={tagsSaving}
             >
@@ -709,9 +799,9 @@ function TaskTagsSection({ tags, newTag, tagsSaving, onNewTagChange, onAddTag, o
 
 function TaskTimelineSection({ createdAt, dueDate, completedAt }) {
   return (
-    <section className="space-y-2 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Cronología</p>
-      <ul className="space-y-2 text-xs text-slate-400">
+      <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
         {createdAt ? <li>Creada {formatRelativeTime(createdAt)}</li> : null}
         {dueDate ? <li>Fecha límite {formatRelativeTime(dueDate)}</li> : null}
         {completedAt ? <li>Completada {formatRelativeTime(completedAt)}</li> : null}
@@ -722,12 +812,12 @@ function TaskTimelineSection({ createdAt, dueDate, completedAt }) {
 
 function TaskActivitySection({ lastActivityLabel, lastActivityType, lastCommentLabel }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Actividad</p>
       <div className="space-y-2 text-slate-300">
         <div>
           <p className="text-xs text-slate-500">Última actividad</p>
-          <p className="text-sm text-white">
+          <p className="text-sm text-slate-900 dark:text-white">
             {lastActivityLabel && lastActivityType
               ? `${lastActivityType} · ${lastActivityLabel}`
               : 'Sin actividad reciente registrada.'}
@@ -735,7 +825,7 @@ function TaskActivitySection({ lastActivityLabel, lastActivityType, lastCommentL
         </div>
         <div>
           <p className="text-xs text-slate-500">Último comentario</p>
-          <p className="text-sm text-white">{lastCommentLabel ?? 'Sin comentarios recientes.'}</p>
+          <p className="text-sm text-slate-900 dark:text-white">{lastCommentLabel ?? 'Sin comentarios recientes.'}</p>
         </div>
       </div>
     </section>
@@ -759,7 +849,7 @@ function TaskSubtasksSection({
   membersById
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-800/60 bg-slate-950/50 p-4 text-sm text-slate-200">
+    <section className="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <SubtasksHeader
         subtasks={subtasks}
         completedSubtasks={completedSubtasks}
@@ -801,7 +891,7 @@ function SubtasksHeader({
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p className="text-xs uppercase tracking-wide text-slate-500">Subtareas</p>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
           {subtasks.length
             ? `${completedSubtasks}/${subtasks.length} completadas`
             : 'Sin subtareas registradas.'}
@@ -833,7 +923,7 @@ function SubtasksList({
     <>
       {subtaskError ? <Alert color="failure">{subtaskError}</Alert> : null}
       {subtasksLoading && !subtasks.length ? (
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
           <Spinner size="sm" />
           <span>Cargando subtareas…</span>
         </div>
@@ -864,12 +954,12 @@ function SubtaskItem({ subtask, membersById, onToggleSubtask, onDeleteSubtask })
     : null;
   const dueLabel = subtask.due_date
     ? new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(
-        new Date(subtask.due_date)
-      )
+      new Date(subtask.due_date)
+    )
     : null;
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-800/70 bg-slate-900/40 p-3">
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-800/70 bg-white dark:bg-slate-900/10 p-3">
       <Checkbox
         checked={subtask.completed}
         onChange={() => onToggleSubtask(subtask)}
@@ -877,13 +967,12 @@ function SubtaskItem({ subtask, membersById, onToggleSubtask, onDeleteSubtask })
       />
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm font-medium ${
-            subtask.completed ? 'text-slate-500 line-through' : 'text-white'
-          }`}
+          className={`text-sm font-medium ${subtask.completed ? 'text-slate-500 line-through' : 'text-white'
+            }`}
         >
           {subtask.title}
         </p>
-        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
+        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
           {assigneeLabel ? <span>Responsable: {assigneeLabel}</span> : null}
           {dueLabel ? <span>Vence {dueLabel}</span> : null}
           {subtask.updated_at ? (
@@ -915,3 +1004,9 @@ function SubtaskCreateForm({ creatingSubtask, newSubtask, onNewSubtaskChange, on
     </form>
   );
 }
+
+
+
+
+
+

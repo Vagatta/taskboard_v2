@@ -17,7 +17,7 @@ function ToggleRow({ id, label, checked, onChange, className = '' }) {
   return (
     <label
       htmlFor={id}
-      className={`flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-left transition hover:border-primary/40 ${className}`}
+      className={`flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/40 backdrop-blur-sm px-4 py-3 text-left transition hover:border-primary/40 ${className}`}
     >
       <Checkbox
         id={id}
@@ -25,7 +25,7 @@ function ToggleRow({ id, label, checked, onChange, className = '' }) {
         onChange={(event) => onChange(event.target.checked)}
         className="mt-1 shrink-0"
       />
-      <span className="text-sm leading-snug text-slate-200 break-words">{label}</span>
+      <span className="text-sm leading-snug text-slate-700 dark:text-slate-200 break-words">{label}</span>
     </label>
   );
 }
@@ -236,7 +236,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   />
                 </div>
                 <div className="flex flex-1 flex-col items-center gap-3 text-center sm:items-start sm:text-left">
-                  <p className="text-sm font-medium text-slate-200">Personaliza tu imagen de perfil</p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Personaliza tu imagen de perfil</p>
                   <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:justify-start">
                     <Button
                       size="xs"
@@ -273,7 +273,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="profile-name" className="text-xs uppercase tracking-wide text-slate-400">
+                <Label htmlFor="profile-name" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                   Nombre visible
                 </Label>
                 <TextInput
@@ -284,7 +284,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                 />
               </div>
               <div>
-                <Label htmlFor="profile-company" className="text-xs uppercase tracking-wide text-slate-400">
+                <Label htmlFor="profile-company" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                   Compañía
                 </Label>
                 <TextInput
@@ -295,14 +295,14 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                 />
               </div>
               <div>
-                <Label htmlFor="profile-bio" className="text-xs uppercase tracking-wide text-slate-400">
+                <Label htmlFor="profile-bio" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                   Bio breve
                 </Label>
                 <textarea
                   id="profile-bio"
                   value={profileDraft.bio}
                   onChange={(event) => setProfileDraft((prev) => ({ ...prev, bio: event.target.value }))}
-                  className="h-40 w-full rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/50 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="h-40 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 px-3 py-3 text-sm text-slate-700 dark:text-slate-200 shadow-inner shadow-slate-200/50 dark:shadow-slate-950/50 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Cuenta algo sobre ti"
                 />
               </div>
@@ -320,9 +320,9 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
         );
       case 'security':
         return (
-          <div className="space-y-5 text-sm text-slate-200">
-            <div className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Modos de acceso</p>
+          <div className="space-y-5 text-sm text-slate-700 dark:text-slate-200">
+            <div className="grid gap-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Modos de acceso</p>
               {authProvider !== 'email' && authProvider !== 'password' ? (
                 <Alert color="info" className="text-xs text-slate-100">
                   Inicias sesión con {authProvider}. Puedes definir una contraseña local para usarla como respaldo.
@@ -350,15 +350,15 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                 />
               </div>
             </div>
-            <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+            <div className="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Actualiza tu contraseña</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Actualiza tu contraseña</p>
                 <p className="text-xs leading-snug text-slate-500 sm:max-w-xs sm:text-right">
                   Asegúrate de usar una contraseña única y fuerte.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password-current" className="text-xs uppercase tracking-wide text-slate-400">
+                <Label htmlFor="password-current" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                   Contraseña actual
                 </Label>
                 <TextInput
@@ -375,7 +375,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="password-new" className="text-xs uppercase tracking-wide text-slate-400">
+                  <Label htmlFor="password-new" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                     Nueva contraseña
                   </Label>
                   <TextInput
@@ -392,7 +392,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password-confirm" className="text-xs uppercase tracking-wide text-slate-400">
+                  <Label htmlFor="password-confirm" className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                     Confirmar
                   </Label>
                   <TextInput
@@ -423,7 +423,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
         );
       case 'notifications':
         return (
-          <div className="space-y-3 text-sm text-slate-200">
+          <div className="space-y-3 text-sm text-slate-700 dark:text-slate-200">
             <div className="flex items-start gap-3">
               <Checkbox
                 id="notify-email"
@@ -432,7 +432,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   setNotificationSettings((prev) => ({ ...prev, emailUpdates: event.target.checked }))
                 }
               />
-              <Label htmlFor="notify-email" className="text-sm text-slate-300">
+              <Label htmlFor="notify-email" className="text-sm text-slate-700 dark:text-slate-300">
                 Recibir actualizaciones por correo
               </Label>
             </div>
@@ -444,7 +444,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   setNotificationSettings((prev) => ({ ...prev, weeklySummary: event.target.checked }))
                 }
               />
-              <Label htmlFor="notify-summary" className="text-sm text-slate-300">
+              <Label htmlFor="notify-summary" className="text-sm text-slate-700 dark:text-slate-300">
                 Enviar resumen semanal
               </Label>
             </div>
@@ -456,7 +456,7 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   setNotificationSettings((prev) => ({ ...prev, productNews: event.target.checked }))
                 }
               />
-              <Label htmlFor="notify-news" className="text-sm text-slate-300">
+              <Label htmlFor="notify-news" className="text-sm text-slate-700 dark:text-slate-300">
                 Mantenerme al tanto de novedades del producto
               </Label>
             </div>
@@ -569,11 +569,11 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
   }
 
   return (
-    <Card className="border border-slate-800 bg-gradient-to-br from-slate-900/80 via-slate-900/70 to-slate-950/80 shadow-2xl shadow-slate-950/40">
+    <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-2xl shadow-slate-200/40 dark:shadow-slate-950/40">
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <div className="relative h-20 w-20">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-700"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-700"></div>
             <Avatar
               img={headerAvatarRenderer}
               alt={`Avatar de ${displayName}`}
@@ -584,10 +584,10 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
             />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-white" aria-live="polite" title={displayName}>
+            <p className="truncate text-lg font-semibold text-slate-900 dark:text-white" aria-live="polite" title={displayName}>
               {displayName}
             </p>
-            <p className="truncate text-sm text-slate-400" title={email}>
+            <p className="truncate text-sm text-slate-600 dark:text-slate-400" title={email}>
               {email}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -608,8 +608,8 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
           <UserStatCard title="Colaboradores" value="8" description="En tus proyectos" />
         </div>
 
-        <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Preferencias rápidas</h2>
+        <section className="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/10 p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Preferencias rápidas</h2>
           <div className="flex flex-wrap gap-2">
             {plans.map((item) => (
               <Tooltip content={item.hint} key={item.id} placement="bottom">
@@ -617,11 +617,10 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
                   type="button"
                   onClick={() => setActivePreference(item.id)}
                   aria-pressed={activePreference === item.id}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:min-w-[15rem] ${
-                    activePreference === item.id
-                      ? 'border-primary/60 bg-primary/10 text-white'
-                      : 'border-slate-800 bg-slate-900/60 text-slate-200 hover:border-primary/50 hover:bg-slate-900/80'
-                  }`}
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:min-w-[15rem] ${activePreference === item.id
+                    ? 'border-primary/60 bg-primary/10 text-primary-700 dark:text-white'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-200 hover:border-primary/50 hover:bg-slate-50 dark:hover:bg-slate-900/80'
+                    }`}
                 >
                   <span className="flex-1 whitespace-nowrap">{item.label}</span>
                   <span aria-hidden className="text-xs text-slate-500">
@@ -631,23 +630,23 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
               </Tooltip>
             ))}
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Configuración</h3>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Configuración</h3>
             <div className="mt-3">{preferencePanel()}</div>
           </div>
           {feedback ? (
-            <Alert color="info" onDismiss={() => setFeedback(null)} className="text-xs text-slate-200">
+            <Alert color="info" onDismiss={() => setFeedback(null)} className="text-xs text-cyan-900 dark:text-cyan-100">
               {feedback.message}
             </Alert>
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Actividad reciente</h2>
-          <ul className="mt-3 space-y-3 text-sm text-slate-300">
+        <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/10 p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Actividad reciente</h2>
+          <ul className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
             <li className="flex items-start justify-between gap-4">
               <span>Último acceso</span>
-              <span className="font-medium text-white">{formattedAccess}</span>
+              <span className="font-medium text-slate-900 dark:text-white">{formattedAccess}</span>
             </li>
             <li className="flex items-start justify-between gap-4">
               <span>Sincronización</span>
@@ -655,28 +654,28 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
             </li>
             <li className="flex items-start justify-between gap-4">
               <span>Plan</span>
-              <span className="font-medium text-white">Free</span>
+              <span className="font-medium text-slate-900 dark:text-white">Free</span>
             </li>
           </ul>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/10 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Novedades del producto</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Novedades del producto</h2>
             <Badge color="info" size="sm" className="uppercase">Nuevo</Badge>
           </div>
-          <ul className="space-y-3 text-sm text-slate-200">
-            <li className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-              <p className="font-medium text-white">Integración con IA para sugerir tareas</p>
-              <p className="text-xs text-slate-400">Estamos probando sugerencias automáticas según el historial del proyecto. ¡Únete a la beta! </p>
+          <ul className="space-y-3 text-sm text-slate-700 dark:text-slate-200">
+            <li className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-3">
+              <p className="font-medium text-slate-900 dark:text-white">Integración con IA para sugerir tareas</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">Estamos probando sugerencias automáticas según el historial del proyecto. ¡Únete a la beta! </p>
             </li>
-            <li className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-              <p className="font-medium text-white">Automatizaciones programadas</p>
-              <p className="text-xs text-slate-400">Configura recordatorios semanales y tareas recurrentes. Disponible a partir de diciembre.</p>
+            <li className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-3">
+              <p className="font-medium text-slate-900 dark:text-white">Automatizaciones programadas</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">Configura recordatorios semanales y tareas recurrentes. Disponible a partir de diciembre.</p>
             </li>
-            <li className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-              <p className="font-medium text-white">Panel público compartible</p>
-              <p className="text-xs text-slate-400">Comparte el progreso del proyecto con tu equipo externo mediante enlaces públicos.</p>
+            <li className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-3">
+              <p className="font-medium text-slate-900 dark:text-white">Panel público compartible</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">Comparte el progreso del proyecto con tu equipo externo mediante enlaces públicos.</p>
             </li>
           </ul>
           <Button color="light" size="xs" className="w-full sm:w-auto" onClick={() => setFeedback({ section: 'news', message: 'Te avisaremos cuando haya novedades.' })}>
@@ -691,3 +690,9 @@ export default function UserPanel({ user, onSignOut, authLoading }) {
     </Card>
   );
 }
+
+
+
+
+
+

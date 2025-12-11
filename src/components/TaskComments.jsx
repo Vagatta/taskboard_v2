@@ -322,11 +322,11 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
   };
 
   return (
-    <Card className="bg-slate-950/50">
+    <Card className="bg-white dark:bg-slate-950/50 shadow-none">
       <div className="space-y-3">
         <header className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-semibold text-white">Comentarios</h4>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Comentarios</h4>
             <p className="text-xs text-slate-500">Participa en la conversación de "{taskTitle}".</p>
           </div>
           {loading ? <Spinner size="sm" /> : null}
@@ -349,15 +349,15 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
               const isAuthor = currentUserId && comment.author_id === currentUserId;
 
               return (
-                <div key={comment.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                <div key={comment.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                     <span className="font-semibold text-slate-100">{author?.member_email ?? comment.author_id}</span>
                     {createdAt ? <span>{createdAt.toLocaleString()}</span> : null}
                     {isAuthor ? (
                       <div className="ml-auto flex items-center gap-2">
                         <button
                           type="button"
-                          className="text-[11px] text-slate-500 hover:text-slate-200 hover:underline underline-offset-2"
+                          className="text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-200 hover:underline underline-offset-2"
                           onClick={() => startEditComment(comment)}
                           disabled={savingEdit || deletingCommentId === comment.id}
                         >
@@ -443,14 +443,14 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
             maxLength={500}
           />
           {showMentionDropdown && mentionSuggestions.length > 0 ? (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-2 text-sm">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900/80 p-2 text-sm">
               <p className="mb-1 text-xs text-slate-500">Menciona a:</p>
               <div className="flex flex-col gap-1">
                 {mentionSuggestions.map((member) => (
                   <button
                     key={member.member_id}
                     type="button"
-                    className="rounded-lg px-2 py-1 text-left text-white hover:bg-slate-800"
+                    className="rounded-lg px-2 py-1 text-left text-slate-900 dark:text-white hover:bg-slate-800"
                     onClick={() => insertMentionAtCursor(member)}
                   >
                     @{member.member_email ?? member.member_id}
@@ -489,3 +489,9 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
     </Card>
   );
 }
+
+
+
+
+
+

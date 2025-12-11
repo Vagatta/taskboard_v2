@@ -18,11 +18,11 @@ export default function TaskCreatePanel({
   const canCreate = Boolean(projectId);
 
   return (
-    <Card className="bg-slate-950/40">
+    <Card className="bg-slate-100 dark:bg-slate-950/10 border-slate-200 dark:border-slate-800 shadow-none">
       <div className="space-y-3">
         {showTitle ? (
           <div>
-            <h3 className="text-sm font-semibold text-white">Nueva tarea</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Nueva tarea</h3>
           </div>
         ) : null}
         <form onSubmit={onSubmit} className="space-y-3">
@@ -47,7 +47,7 @@ export default function TaskCreatePanel({
                 value={newTaskDueDate}
                 disabled={!canCreate || addingTask}
                 onChange={(event) => onChangeDueDate(event.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-info focus:ring-info"
+                className="rounded-lg border border-slate-700 bg-white dark:bg-slate-900/10 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-info focus:ring-info"
               />
             </div>
             <div className="flex w-full flex-col gap-1 sm:w-auto">
@@ -88,3 +88,9 @@ export default function TaskCreatePanel({
     </Card>
   );
 }
+
+
+
+
+
+

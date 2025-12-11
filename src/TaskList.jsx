@@ -167,8 +167,8 @@ const TaskList = forwardRef(function TaskList(
 
       const safeTags = Array.isArray(nextTags)
         ? nextTags
-            .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
-            .filter((tag, index, array) => tag && array.indexOf(tag) === index)
+          .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+          .filter((tag, index, array) => tag && array.indexOf(tag) === index)
         : [];
 
       setErrorMessage('');
@@ -1389,14 +1389,14 @@ const TaskList = forwardRef(function TaskList(
 
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-800/60 bg-slate-950/60 px-4 py-3 text-xs text-slate-400">
-          <span className="text-sm font-semibold text-white">{visibleTasks} tareas visibles</span>
-          <span className="text-emerald-300">Completadas: {completedVisible}</span>
-          <span className="text-amber-200">Pendientes: {pendingVisible}</span>
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/60 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-sm font-semibold text-slate-900 dark:text-white">{visibleTasks} tareas visibles</span>
+          <span className="text-emerald-700 dark:text-emerald-300">Completadas: {completedVisible}</span>
+          <span className="text-amber-700 dark:text-amber-200">Pendientes: {pendingVisible}</span>
         </div>
         {hasSelection ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-700 bg-cyan-950/40 px-4 py-2 text-xs text-slate-200">
-            <span className="text-sm font-semibold text-cyan-100">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 px-4 py-2 text-xs text-cyan-900 dark:text-cyan-100">
+            <span className="text-sm font-semibold text-cyan-800 dark:text-cyan-200">
               {selectedTaskIds.length} tarea
               {selectedTaskIds.length === 1 ? '' : 's'} seleccionada
               {selectedTaskIds.length === 1 ? '' : 's'}
@@ -1451,13 +1451,14 @@ const TaskList = forwardRef(function TaskList(
             </Button>
           </div>
         ) : null}
-        <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/40 shadow-lg shadow-slate-950/40">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/40 shadow-lg shadow-slate-200/40 dark:shadow-slate-950/40">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm text-slate-100">
-              <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950/70 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3 w-10">
                     <Checkbox
+                      className="text-cyan-600 focus:ring-cyan-600 border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-cyan-600"
                       checked={allVisibleSelected}
                       onChange={(event) => {
                         const checked = event.target.checked;
@@ -1499,7 +1500,7 @@ const TaskList = forwardRef(function TaskList(
                     ? `${rowBaseClass} border-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20`
                     : isHighPriority
                       ? `${rowBaseClass} border-fuchsia-500/80 bg-fuchsia-500/5 hover:bg-fuchsia-500/10`
-                      : `${rowBaseClass} hover:bg-slate-900/60`;
+                      : `${rowBaseClass} hover:bg-slate-100 dark:hover:bg-slate-900/60`;
 
                   return (
                     <tr
@@ -1511,8 +1512,9 @@ const TaskList = forwardRef(function TaskList(
                         setActiveTasksSection('tasks');
                       }}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
+                          className="text-cyan-600 focus:ring-cyan-600 border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-cyan-600"
                           checked={selectedTaskIds.includes(task.id)}
                           onChange={(event) => {
                             event.stopPropagation();
@@ -1529,7 +1531,7 @@ const TaskList = forwardRef(function TaskList(
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1545,7 +1547,7 @@ const TaskList = forwardRef(function TaskList(
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <p className={`font-semibold ${task.completed ? 'text-slate-400 line-through' : 'text-white'}`}>{task.title}</p>
+                        <p className={`font-semibold ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{task.title}</p>
                         {task.description ? (
                           <p className="text-xs text-slate-500" title={task.description}>
                             {task.description.length > 80 ? `${task.description.slice(0, 80)}…` : task.description}
@@ -1559,7 +1561,7 @@ const TaskList = forwardRef(function TaskList(
                             {tags.slice(0, 4).map((tag) => (
                               <span
                                 key={tag}
-                                className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] text-slate-200"
+                                className="rounded-full bg-slate-200 dark:bg-slate-900 px-2 py-0.5 text-[10px] text-slate-700 dark:text-slate-200"
                               >
                                 #{tag}
                               </span>
@@ -1570,7 +1572,7 @@ const TaskList = forwardRef(function TaskList(
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{assigneeMember?.member_email ?? 'Sin asignar'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{assigneeMember?.member_email ?? 'Sin asignar'}</td>
                       <td className="px-4 py-3">
                         {task.priority ? (
                           <Badge
@@ -1596,7 +1598,7 @@ const TaskList = forwardRef(function TaskList(
                         <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={isOverdue ? 'text-rose-200 font-semibold' : 'text-slate-300'}>{dueLabel}</span>
+                        <span className={isOverdue ? 'text-rose-600 dark:text-rose-200 font-semibold' : 'text-slate-700 dark:text-slate-300'}>{dueLabel}</span>
                       </td>
                       <td className="px-4 py-3 text-slate-400">
                         {updatedAt ? formatRelativeTime(new Date(updatedAt)) : 'Sin registro'}
@@ -1953,14 +1955,17 @@ const TaskList = forwardRef(function TaskList(
             : { label: 'M (medio)', color: 'indigo' };
       const tags = Array.isArray(task.tags) ? task.tags : [];
 
+      const isAuthUserAssignee = task.assigned_to === userId;
+
       return (
         <div
           key={task.id}
-          className={`flex flex-col gap-4 rounded-2xl border bg-slate-950/70 p-4 transition ${
-            priority === 'high'
-              ? 'border-fuchsia-500/80 bg-fuchsia-500/5 shadow-lg shadow-fuchsia-500/20 hover:border-fuchsia-400 hover:bg-fuchsia-500/10'
-              : 'border-slate-800 hover:border-primary/40'
-          }`}
+          className={`flex flex-col gap-4 rounded-2xl border transition p-4 ${priority === 'high'
+            ? 'border-fuchsia-500/80 bg-fuchsia-500/5 shadow-lg shadow-fuchsia-500/20 hover:border-fuchsia-400 hover:bg-fuchsia-500/10'
+            : isAuthUserAssignee
+              ? 'border-cyan-500/50 bg-cyan-500/5 shadow-md shadow-cyan-500/10 dark:shadow-cyan-900/20 hover:border-cyan-400 hover:bg-cyan-500/10'
+              : 'bg-white dark:bg-slate-950/70 border-slate-200 dark:border-slate-800 hover:border-primary/40'
+            }`}
           onClick={() => {
             setSelectedTaskDetail(task);
             setViewMode('detail');
@@ -2086,7 +2091,10 @@ const TaskList = forwardRef(function TaskList(
                 size="xs"
                 disabled={isProcessing}
                 className="w-full sm:w-auto"
-                onClick={() => toggleTaskCompletion(task)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleTaskCompletion(task);
+                }}
               >
                 {task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
               </Button>
@@ -2205,12 +2213,16 @@ const TaskList = forwardRef(function TaskList(
       const renderTaskChip = (task) => {
         const dueDate = task.due_date ? new Date(task.due_date) : null;
         const timeLabel = dueDate ? timelineTimeFormatter.format(dueDate) : null;
+        const isAuthUserAssignee = task.assigned_to === userId;
 
         return (
           <button
             key={task.id}
             type="button"
-            className="w-full rounded-xl border border-slate-800 bg-slate-900/50 p-2 text-left text-xs text-slate-200 hover:border-cyan-400 hover:bg-cyan-900/40"
+            className={`w-full rounded-xl border p-2 text-left text-xs transition-colors ${isAuthUserAssignee
+              ? 'border-cyan-500/40 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-100 hover:bg-cyan-200 dark:hover:bg-cyan-900/50'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-700 dark:text-slate-200 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/40'
+              }`}
             onClick={() => {
               setSelectedTaskDetail(task);
               setViewMode('detail');
@@ -2218,7 +2230,7 @@ const TaskList = forwardRef(function TaskList(
             }}
           >
             {timeLabel ? <span className="mr-1 text-[10px] text-slate-400">{timeLabel}</span> : null}
-            <span className={task.completed ? 'line-through text-slate-400' : 'text-slate-100'}>{task.title}</span>
+            <span className={task.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-slate-100'}>{task.title}</span>
           </button>
         );
       };
@@ -2226,8 +2238,8 @@ const TaskList = forwardRef(function TaskList(
       return (
         <div className="space-y-4">
           {overdue.length > 0 ? (
-            <Card className="bg-slate-950/40">
-              <div className="mb-2 text-xs font-semibold text-rose-200">Vencidas</div>
+            <Card className="bg-white dark:bg-slate-950/40">
+              <div className="mb-2 text-xs font-semibold text-rose-700 dark:text-rose-200">Vencidas</div>
               <div className="space-y-2">
                 {overdue.map((task) => renderTaskChip(task))}
               </div>
@@ -2240,9 +2252,9 @@ const TaskList = forwardRef(function TaskList(
                 const key = day.toISOString().split('T')[0];
                 const dayTasks = dayMap[key] ?? [];
                 return (
-                  <Card key={key} className="min-w-[180px] bg-slate-950/40">
+                  <Card key={key} className="min-w-[180px] bg-white dark:bg-slate-950/40">
                     <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
-                      <span className="font-semibold text-white">{timelineDayFormatter.format(day)}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{timelineDayFormatter.format(day)}</span>
                       <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
                     </div>
                     <div className="space-y-2">
@@ -2261,16 +2273,16 @@ const TaskList = forwardRef(function TaskList(
           {(later.length > 0 || undated.length > 0) && (
             <div className="grid gap-4 md:grid-cols-2">
               {later.length > 0 ? (
-                <Card className="bg-slate-950/40">
-                  <div className="mb-2 text-xs font-semibold text-slate-200">Más adelante</div>
+                <Card className="bg-white dark:bg-slate-950/40">
+                  <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Más adelante</div>
                   <div className="space-y-2">
                     {later.map((task) => renderTaskChip(task))}
                   </div>
                 </Card>
               ) : null}
               {undated.length > 0 ? (
-                <Card className="bg-slate-950/40">
-                  <div className="mb-2 text-xs font-semibold text-slate-200">Sin fecha</div>
+                <Card className="bg-white dark:bg-slate-950/40">
+                  <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Sin fecha</div>
                   <div className="space-y-2">
                     {undated.map((task) => renderTaskChip(task))}
                   </div>
@@ -2358,14 +2370,14 @@ const TaskList = forwardRef(function TaskList(
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-full border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs hover:border-cyan-400"
+                className="rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-2 py-1 text-xs text-slate-700 dark:text-slate-200 hover:border-cyan-400"
                 onClick={goToPreviousMonth}
               >
                 Anterior
               </button>
               <button
                 type="button"
-                className="rounded-full border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs hover:border-cyan-400"
+                className="rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-2 py-1 text-xs text-slate-700 dark:text-slate-200 hover:border-cyan-400"
                 onClick={goToNextMonth}
               >
                 Siguiente
@@ -2404,12 +2416,11 @@ const TaskList = forwardRef(function TaskList(
               return (
                 <Card
                   key={key}
-                  className={`flex min-h-[96px] flex-col rounded-2xl border bg-slate-950/60 p-2 ${
-                    isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-800'
-                  }`}
+                  className={`flex min-h-[96px] flex-col rounded-2xl border bg-white dark:bg-slate-950/60 p-2 ${isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-200 dark:border-slate-800'
+                    }`}
                 >
                   <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className={isToday ? 'font-semibold text-cyan-200' : 'font-semibold text-slate-200'}>
+                    <span className={isToday ? 'font-semibold text-cyan-600 dark:text-cyan-200' : 'font-semibold text-slate-900 dark:text-slate-200'}>
                       {date.getDate()}
                     </span>
                     <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
@@ -2421,12 +2432,16 @@ const TaskList = forwardRef(function TaskList(
                       dayTasks.slice(0, 3).map((task) => {
                         const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
                         const assigneeLabel = assigneeMember?.member_email ?? task.assigned_to ?? 'Sin asignar';
+                        const isAuthUserAssignee = task.assigned_to === userId;
 
                         return (
                           <button
                             key={task.id}
                             type="button"
-                            className="w-full rounded-lg border border-slate-800 bg-slate-900/60 px-1 py-0.5 text-left text-[11px] text-slate-200 hover:border-cyan-400 hover:bg-cyan-900/40"
+                            className={`w-full rounded-lg border px-1 py-0.5 text-left text-[11px] transition-colors ${isAuthUserAssignee
+                              ? 'border-cyan-500/40 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-100 hover:bg-cyan-200 dark:hover:bg-cyan-900/50'
+                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/40'
+                              }`}
                             onClick={() => {
                               setSelectedTaskDetail(task);
                               setViewMode('detail');
@@ -2435,7 +2450,7 @@ const TaskList = forwardRef(function TaskList(
                             title={task.title}
                           >
                             <div className="whitespace-normal break-words leading-tight">{task.title}</div>
-                            <div className="text-[10px] text-slate-400">Resp: {assigneeLabel}</div>
+                            <div className="truncate text-[10px] text-slate-400" title={`Resp: ${assigneeLabel}`}>Resp: {assigneeLabel}</div>
                           </button>
                         );
                       })
@@ -2509,186 +2524,296 @@ const TaskList = forwardRef(function TaskList(
 
   return (
     <div className="space-y-6">
-      <Card className="bg-slate-950/40">
+      <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-slate-400">Proyecto activo</p>
-            <h2 className="text-lg font-semibold text-white">{project?.name ?? 'Sin proyecto seleccionado'}</h2>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{project?.name ?? 'Sin proyecto seleccionado'}</h2>
             <p className="text-xs text-slate-500">Propietario: {projectOwnerLabel}</p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
             <div className="flex flex-col items-center text-center">
               <p className="text-slate-500">Total</p>
-              <p className="text-base font-semibold text-white">{totalTasks}</p>
+              <p className="text-base font-semibold text-slate-900 dark:text-white">{totalTasks}</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <p className="text-slate-500">Pendientes</p>
-              <p className="text-base font-semibold text-white">{pendingCount}</p>
+              <p className="text-base font-semibold text-slate-900 dark:text-white">{pendingCount}</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <p className="text-slate-500">Completadas</p>
-              <p className="text-base font-semibold text-white">{completedCount}</p>
+              <p className="text-base font-semibold text-slate-900 dark:text-white">{completedCount}</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <p className="text-slate-500">Altas atrasadas</p>
-              <p className="text-base font-semibold text-rose-300">{highPriorityStats.overdue}</p>
+              <p className="text-base font-semibold text-rose-600 dark:text-rose-300">{highPriorityStats.overdue}</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <p className="text-slate-500">Altas hoy</p>
-              <p className="text-base font-semibold text-amber-200">{highPriorityStats.dueToday}</p>
+              <p className="text-base font-semibold text-amber-600 dark:text-amber-200">{highPriorityStats.dueToday}</p>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card className="bg-slate-950/40">
-        <Tabs aria-label="Secciones principales de tareas" variant="underline" className="w-full">
-          <TabItem
-            title="Tareas"
-            active={activeTasksSection === 'tasks'}
-            onClick={() => setActiveTasksSection('tasks')}
-          >
-            <div className="mt-4 space-y-4">
-              <Tabs aria-label="Herramientas de tareas" variant="underline" className="w-full">
-                <TabItem
-                  title="Buscar"
-                  active={taskToolsTab === 'search'}
-                  onClick={() => setTaskToolsTab('search')}
+      <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1">
+            {[
+              {
+                id: 'tasks', label: 'Tareas', icon: (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                  </svg>
+                )
+              },
+              {
+                id: 'insights', label: 'Menciones y actividad', icon: (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                  </svg>
+                )
+              }
+            ].map((tab) => {
+              const isActive = activeTasksSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTasksSection(tab.id)}
+                  className={`flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-3 text-sm font-medium transition-colors ${isActive
+                      ? 'border-cyan-500 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400'
+                      : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300'
+                    }`}
                 >
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>Filtros de búsqueda</span>
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 min-h-[300px]">
+            {activeTasksSection === 'tasks' && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    {
+                      id: 'search', label: 'Buscar', icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                      )
+                    },
+                    {
+                      id: 'create', label: 'Crear tarea', icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                      )
+                    }
+                  ].map((tool) => {
+                    const isActive = taskToolsTab === tool.id;
+                    return (
                       <button
+                        key={tool.id}
                         type="button"
-                        className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-200 hover:bg-sky-500/20 hover:text-sky-100"
-                        onClick={() => setShowFilters((prev) => !prev)}
+                        onClick={() => setTaskToolsTab(tool.id)}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${isActive
+                            ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                            : 'border-slate-200 bg-white/50 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-300'
+                          }`}
                       >
-                        {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+                        {tool.icon}
+                        <span>{tool.label}</span>
                       </button>
+                    );
+                  })}
+                </div>
+
+                <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+                  {taskToolsTab === 'search' && (
+                    <div className="space-y-4">
+
+                      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                        <span>Filtros de búsqueda</span>
+                        <button
+                          type="button"
+                          className="rounded-full border border-sky-200 dark:border-sky-400/40 bg-sky-50 dark:bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-700 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-500/20 hover:text-sky-800 dark:hover:text-sky-100"
+                          onClick={() => setShowFilters((prev) => !prev)}
+                        >
+                          {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+                        </button>
+                      </div>
+
+                      {showFilters ? (
+                        <TaskFiltersPanel
+                          projectId={projectId}
+                          searchQuery={searchQuery}
+                          onSearchQueryChange={setSearchQuery}
+                          quickFilters={quickFilters}
+                          statusFilter={statusFilter}
+                          setStatusFilter={setStatusFilter}
+                          assigneeFilter={assigneeFilter}
+                          setAssigneeFilter={setAssigneeFilter}
+                          priorityFilter={priorityFilter}
+                          setPriorityFilter={setPriorityFilter}
+                          effortFilter={effortFilter}
+                          setEffortFilter={setEffortFilter}
+                          tagFilter={tagFilter}
+                          setTagFilter={setTagFilter}
+                          sortMode={sortMode}
+                          setSortMode={setSortMode}
+                          onlyMentionedFilter={onlyMentionedFilter}
+                          setOnlyMentionedFilter={setOnlyMentionedFilter}
+                          hasMentionedTasks={mentionedTaskIds.size > 0}
+                          members={members}
+                          availableTags={availableTags}
+                        />
+                      ) : null}
                     </div>
+                  )}
 
-                    {showFilters ? (
-                      <TaskFiltersPanel
+                  {taskToolsTab === 'create' && (
+                    <div className="mt-2">
+                      <TaskCreatePanel
                         projectId={projectId}
-                        searchQuery={searchQuery}
-                        onSearchQueryChange={setSearchQuery}
-                        quickFilters={quickFilters}
-                        statusFilter={statusFilter}
-                        setStatusFilter={setStatusFilter}
-                        assigneeFilter={assigneeFilter}
-                        setAssigneeFilter={setAssigneeFilter}
-                        priorityFilter={priorityFilter}
-                        setPriorityFilter={setPriorityFilter}
-                        effortFilter={effortFilter}
-                        setEffortFilter={setEffortFilter}
-                        tagFilter={tagFilter}
-                        setTagFilter={setTagFilter}
-                        sortMode={sortMode}
-                        setSortMode={setSortMode}
-                        onlyMentionedFilter={onlyMentionedFilter}
-                        setOnlyMentionedFilter={setOnlyMentionedFilter}
-                        hasMentionedTasks={mentionedTaskIds.size > 0}
-                        members={members}
-                        availableTags={availableTags}
-                      />
-                    ) : null}
-                  </div>
-                </TabItem>
-
-                <TabItem
-                  title="Crear tarea"
-                  active={taskToolsTab === 'create'}
-                  onClick={() => setTaskToolsTab('create')}
-                >
-                  <div className="mt-4">
-                    <TaskCreatePanel
-                      projectId={projectId}
-                      newTask={newTask}
-                      newTaskDueDate={newTaskDueDate}
-                      newTaskPriority={newTaskPriority}
-                      newTaskEffort={newTaskEffort}
-                      addingTask={addingTask}
-                      inputRef={newTaskInputRef}
-                      onSubmit={addTask}
-                      onChangeTitle={setNewTask}
-                      onChangeDueDate={setNewTaskDueDate}
-                      onChangePriority={setNewTaskPriority}
-                      onChangeEffort={setNewTaskEffort}
-                      showTitle
-                    />
-                  </div>
-                </TabItem>
-              </Tabs>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/40">
-                <Tabs aria-label="Vistas de tareas" variant="underline" className="w-full">
-                  <TabItem title="Vista lista" active={viewMode === 'list'} onClick={() => setViewMode('list')}>
-                    <div className="mt-4">{listContent}</div>
-                  </TabItem>
-                  <TabItem title="Vista Kanban" active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')}>
-                    <div className="mt-4">{kanbanContent}</div>
-                  </TabItem>
-                  <TabItem title="Vista Timeline" active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')}>
-                    <div className="mt-4">{timelineContent}</div>
-                  </TabItem>
-                  <TabItem title="Vista calendario" active={viewMode === 'calendar'} onClick={() => setViewMode('calendar')}>
-                    <div className="mt-4">{calendarContent}</div>
-                  </TabItem>
-                  <TabItem title="Vista tablón" active={viewMode === 'sections'} onClick={() => setViewMode('sections')}>
-                    <div className="mt-4">{sectionsContent}</div>
-                  </TabItem>
-                  <TabItem
-                    title="Vista detalle"
-                    active={viewMode === 'detail'}
-                    onClick={() => setViewMode('detail')}
-                    disabled={!selectedTaskDetail}
-                  >
-                    <div className="mt-4 border_t border-slate-800/60 bg-slate-950/40">
-                      <TaskDetailPanel
-                        task={selectedTaskDetail}
-                        membersById={membersById}
-                        members={members}
-                        workspaceId={workspaceId}
-                        projectId={projectId}
-                        currentUserId={userId}
-                        onClose={() => {
-                          setSelectedTaskDetail(null);
-                          setViewMode('list');
-                        }}
-                        activityMeta={selectedTaskDetail ? taskActivityMeta[selectedTaskDetail.id] : null}
-                        lastCommentAt={selectedTaskDetail ? taskCommentMeta[selectedTaskDetail.id] : null}
-                        subtasks={selectedTaskDetail ? subtasksByTaskId[selectedTaskDetail.id] ?? [] : []}
-                        subtasksLoading={selectedTaskDetail ? Boolean(subtasksLoadingMap[selectedTaskDetail.id]) : false}
-                        subtaskError={subtaskError}
-                        onCreateSubtask={handleCreateSubtask}
-                        onToggleSubtask={handleToggleSubtask}
-                        onDeleteSubtask={handleDeleteSubtask}
-                        onRefreshSubtasks={selectedTaskDetail ? () => loadSubtasksForTask(selectedTaskDetail.id) : undefined}
-                        onUpdateAssignee={updateTaskAssignee}
-                        onUpdatePriority={updateTaskPriority}
-                        onUpdateTags={updateTaskTags}
-                        onUpdateEpic={updateTaskEpic}
-                        onUpdateEffort={updateTaskEpic ? undefined : undefined}
-                        onToggleCompletion={toggleTaskCompletion}
+                        newTask={newTask}
+                        newTaskDueDate={newTaskDueDate}
+                        newTaskPriority={newTaskPriority}
+                        newTaskEffort={newTaskEffort}
+                        addingTask={addingTask}
+                        inputRef={newTaskInputRef}
+                        onSubmit={addTask}
+                        onChangeTitle={setNewTask}
+                        onChangeDueDate={setNewTaskDueDate}
+                        onChangePriority={setNewTaskPriority}
+                        onChangeEffort={setNewTaskEffort}
+                        showTitle
                       />
                     </div>
-                  </TabItem>
-                </Tabs>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950/30 backdrop-blur-lg p-3">
+                  <nav className="flex flex-wrap gap-2 mb-4" aria-label="Vistas de tareas">
+                    {[
+                      {
+                        id: 'list', label: 'Lista', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75Zm0 5.25h.008v.008H3.75V12Zm0 5.25h.008v.008H3.75v-.008Z" />
+                          </svg>
+                        )
+                      },
+                      {
+                        id: 'kanban', label: 'Kanban', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z" />
+                          </svg>
+                        )
+                      },
+                      {
+                        id: 'timeline', label: 'Timeline', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+                          </svg>
+                        )
+                      },
+                      {
+                        id: 'calendar', label: 'Calendario', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                          </svg>
+                        )
+                      },
+                      {
+                        id: 'sections', label: 'Tablón', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
+                          </svg>
+                        )
+                      },
+                      {
+                        id: 'detail', label: 'Detalle', disabled: !selectedTaskDetail, icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                          </svg>
+                        )
+                      }
+                    ].map((tab) => {
+                      const isActive = viewMode === tab.id;
+                      const isDisabled = tab.disabled;
+                      if (isDisabled && !isActive) return null;
+
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => !isDisabled && setViewMode(tab.id)}
+                          disabled={isDisabled}
+                          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${isActive
+                              ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                              : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
+                            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {tab.icon}
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {viewMode === 'list' && <div className="mt-4">{listContent}</div>}
+                    {viewMode === 'kanban' && <div className="mt-4">{kanbanContent}</div>}
+                    {viewMode === 'timeline' && <div className="mt-4">{timelineContent}</div>}
+                    {viewMode === 'calendar' && <div className="mt-4">{calendarContent}</div>}
+                    {viewMode === 'sections' && <div className="mt-4">{sectionsContent}</div>}
+                    {viewMode === 'detail' && selectedTaskDetail && (
+                      <div className="mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4">
+                        <TaskDetailPanel
+                          task={selectedTaskDetail}
+                          membersById={membersById}
+                          members={members}
+                          workspaceId={workspaceId}
+                          projectId={projectId}
+                          currentUserId={userId}
+                          onClose={() => {
+                            setSelectedTaskDetail(null);
+                            setViewMode('list');
+                          }}
+                          activityMeta={selectedTaskDetail ? taskActivityMeta[selectedTaskDetail.id] : null}
+                          lastCommentAt={selectedTaskDetail ? taskCommentMeta[selectedTaskDetail.id] : null}
+                          subtasks={selectedTaskDetail ? subtasksByTaskId[selectedTaskDetail.id] ?? [] : []}
+                          subtasksLoading={selectedTaskDetail ? Boolean(subtasksLoadingMap[selectedTaskDetail.id]) : false}
+                          subtaskError={subtaskError}
+                          onCreateSubtask={handleCreateSubtask}
+                          onToggleSubtask={handleToggleSubtask}
+                          onDeleteSubtask={handleDeleteSubtask}
+                          onRefreshSubtasks={selectedTaskDetail ? () => loadSubtasksForTask(selectedTaskDetail.id) : undefined}
+                          onUpdateAssignee={updateTaskAssignee}
+                          onUpdatePriority={updateTaskPriority}
+                          onUpdateTags={updateTaskTags}
+                          onUpdateEpic={updateTaskEpic}
+                          onUpdateEffort={updateTaskEpic ? undefined : undefined}
+                          onToggleCompletion={toggleTaskCompletion}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </TabItem>
+            )}
 
-          <TabItem
-            title="Menciones y actividad"
-            active={activeTasksSection === 'insights'}
-            onClick={() => setActiveTasksSection('insights')}
-          >
-            <div className="mt-4 space-y-4">
-              <MentionDigest projectId={projectId} members={members} />
-              <ActivityLog projectId={projectId} members={members} />
-            </div>
-          </TabItem>
-        </Tabs>
+            {activeTasksSection === 'insights' && (
+              <div className="mt-4 space-y-4">
+                <MentionDigest projectId={projectId} members={members} />
+                <ActivityLog projectId={projectId} members={members} />
+              </div>
+            )}
+          </div>
+        </div>
       </Card>
 
       {showCreatePanel ? (
@@ -2727,3 +2852,7 @@ const TaskList = forwardRef(function TaskList(
 });
 
 export default TaskList;
+
+
+
+

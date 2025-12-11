@@ -13,8 +13,8 @@ export default function TaskSectionsBoard({
 }) {
   return (
     <div className="space-y-4 px-2 pb-2 sm:px-4 sm:pb-4">
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span className="font-semibold text-white">Vista tablón</span>
+      <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+        <span className="font-semibold text-slate-900 dark:text-white">Vista tablón</span>
         <div className="flex gap-2">
           <Button
             size="xs"
@@ -36,7 +36,7 @@ export default function TaskSectionsBoard({
         {sections.map((section) => (
           <div
             key={section.id}
-            className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4"
+            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/50 shadow-none p-4"
             onDragOver={(event) => {
               if (!onMoveTask) return;
               event.preventDefault();
@@ -50,8 +50,8 @@ export default function TaskSectionsBoard({
               }
             }}
           >
-            <div className="flex items-center justify_between text-xs text-slate-400">
-              <span className="font-semibold text-white">{section.title}</span>
+            <div className="flex items-center justify_between text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white">{section.title}</span>
               <Badge color={section.tasks.length ? 'info' : 'gray'}>{section.tasks.length}</Badge>
             </div>
             <div className="mt-3 space-y-3">
@@ -61,7 +61,7 @@ export default function TaskSectionsBoard({
                 section.tasks.map((task) => (
                   <div
                     key={task.id}
-                    className="cursor-pointer rounded-xl border border-slate-800 bg-slate-900/40 p-3 transition hover:border-cyan-400 hover:bg-cyan-500/5 cursor-move"
+                    className="cursor-pointer rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-3 transition hover:border-cyan-400 hover:bg-cyan-500/5 cursor-move"
                     draggable={Boolean(onMoveTask)}
                     onDragStart={(event) => {
                       if (!onMoveTask) return;
@@ -74,7 +74,7 @@ export default function TaskSectionsBoard({
                       <div className="min-w-0 flex-1">
                         <p
                           className={`truncate text-sm font-semibold ${
-                            task.completed ? 'text-slate-400 line-through' : 'text-white'
+                            task.completed ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'
                           }`}
                         >
                           {task.title}
@@ -88,7 +88,7 @@ export default function TaskSectionsBoard({
                       </div>
                       <button
                         type="button"
-                        className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-[10px] text-slate-400"
+                        className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-[10px] text-slate-600 dark:text-slate-400"
                         onClick={(event) => {
                           event.stopPropagation();
                           onToggleTaskCompletion(task);
@@ -100,7 +100,7 @@ export default function TaskSectionsBoard({
                         <span className={task.completed ? 'text-emerald-300' : 'text-transparent'}>✓</span>
                       </button>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
                       <span className="max-w-full break-words">
                         {task.assigned_to
                           ? membersById[task.assigned_to]?.member_email ?? 'Responsable'
@@ -134,3 +134,9 @@ export default function TaskSectionsBoard({
     </div>
   );
 }
+
+
+
+
+
+

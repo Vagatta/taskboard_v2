@@ -26,10 +26,10 @@ export default function TaskFiltersPanel({
   const canFilter = Boolean(projectId);
 
   return (
-    <Card className="bg-slate-950/40">
+    <Card className="bg-slate-100 dark:bg-slate-950/10 border-slate-200 dark:border-slate-800 shadow-none">
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-white">Filtros rápidos</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Filtros rápidos</h3>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs text-slate-500">Buscar</span>
@@ -40,7 +40,7 @@ export default function TaskFiltersPanel({
             disabled={!canFilter}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-800/60 bg-slate-900/30 p-2">
+        <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800/60 bg-slate-900/30 p-2">
           {quickFilters.map((preset) => {
             const isActive =
               statusFilter === preset.status &&
@@ -144,3 +144,9 @@ export default function TaskFiltersPanel({
     </Card>
   );
 }
+
+
+
+
+
+

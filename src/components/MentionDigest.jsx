@@ -93,11 +93,11 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
   }, [mentions]);
 
   return (
-    <Card className="bg-slate-950/40">
+    <Card className="bg-slate-100 dark:bg-slate-950/60">
       <div className="space-y-3">
         <header className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">Resumen de menciones</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Resumen de menciones</p>
             <p className="text-xs text-slate-500">Últimas referencias directas a miembros del proyecto.</p>
           </div>
           {loading ? <Spinner size="sm" /> : null}
@@ -122,8 +122,8 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
               const taskTitle = payload.task_title ?? payload.task_id ?? 'Tarea';
               const mentionedBy = membersById[payload.mentioned_by]?.member_email ?? payload.mentioned_by;
               return (
-                <div key={userId} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                <div key={userId} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                     <span className="font-semibold text-slate-100">{member?.member_email ?? userId}</span>
                     <Badge color="info" size="xs">
                       {items.length} menc.
@@ -134,7 +134,7 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
                     {mentionedBy ? `${mentionedBy} te mencionó` : 'Nueva mención'} en "{taskTitle}"
                   </p>
                   {payload.comment_excerpt ? (
-                    <p className="mt-1 text-xs text-slate-400">“{payload.comment_excerpt}”</p>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">“{payload.comment_excerpt}”</p>
                   ) : null}
                 </div>
               );
@@ -145,3 +145,9 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
     </Card>
   );
 }
+
+
+
+
+
+

@@ -155,7 +155,7 @@ export default function NotificationPanel({ userId, workspaceId }) {
 
   if (!userId) {
     return (
-      <Card className="bg-slate-950/40">
+      <Card className="bg-white dark:bg-slate-950/10 border-slate-200 dark:border-slate-800 shadow-none">
         <p className="text-sm text-slate-500">Inicia sesión para recibir notificaciones.</p>
       </Card>
     );
@@ -192,11 +192,11 @@ export default function NotificationPanel({ userId, workspaceId }) {
         </div>
       ) : null}
 
-      <Card className="bg-slate-950/40">
+      <Card className="bg-white dark:bg-slate-950/10 border-slate-200 dark:border-slate-800 shadow-none">
         <div className="flex flex-col gap-4">
           <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-white">Notificaciones</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Notificaciones</p>
               <p className="text-xs text-slate-500">Menciones y asignaciones en este workspace.</p>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -237,10 +237,10 @@ export default function NotificationPanel({ userId, workspaceId }) {
                   empty: 'Aún no tienes historial reciente.'
                 }
               ].map((section) => (
-                <section key={section.id} className="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4">
+                <section key={section.id} className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/10 p-4">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-white">{section.title}</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{section.title}</p>
                       <p className="text-xs text-slate-500">{section.description}</p>
                     </div>
                     <Badge color={section.items.length > 0 ? 'info' : 'gray'}>{section.items.length} items</Badge>
@@ -248,15 +248,16 @@ export default function NotificationPanel({ userId, workspaceId }) {
                   {section.items.length === 0 ? (
                     <p className="text-xs text-slate-500">{section.empty}</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className={(section.id === 'history' || section.id === 'unread') ? "space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar" : "space-y-3"}>
                       {section.items.map((notification) => {
                         const meta = resolveMeta(notification);
                         return (
                           <div
                             key={notification.id}
-                            className={`rounded-2xl border p-3 text-sm transition ${
-                              notification.read ? 'border-slate-800 bg-slate-950/50' : 'border-primary/40 bg-slate-900/60'
-                            }`}
+                            className={`rounded-2xl border p-3 text-sm transition ${notification.read
+                              ? 'border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400'
+                              : 'border-primary-200 bg-primary-50 text-slate-900 dark:border-primary/40 dark:bg-slate-900/60 dark:text-white'
+                              }`}
                           >
                             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex items-center gap-2">
@@ -293,3 +294,9 @@ export default function NotificationPanel({ userId, workspaceId }) {
     </div>
   );
 }
+
+
+
+
+
+

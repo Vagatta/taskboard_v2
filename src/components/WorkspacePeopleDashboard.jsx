@@ -121,21 +121,21 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
 
   if (!workspaceId) {
     return (
-      <Card className="border border-slate-800 bg-slate-950/60">
-        <p className="text-sm text-slate-400">Selecciona un workspace para ver la carga de tareas por persona.</p>
+      <Card className="border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 shadow-none">
+        <p className="text-sm text-slate-600 dark:text-slate-400">Selecciona un workspace para ver la carga de tareas por persona.</p>
       </Card>
     );
   }
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/60">
+    <Card className="border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 shadow-none">
       <div className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Colaboradores</p>
-            <p className="text-lg font-semibold text-white">Tareas por persona en el workspace</p>
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">Tareas por persona en el workspace</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-2">
               <span>Estado</span>
               <Select
@@ -171,12 +171,12 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
         {error ? (
           <Alert color="failure">{error}</Alert>
         ) : loading ? (
-          <div className="flex items-center justify-center py-10 text-slate-400">
+          <div className="flex items-center justify-center py-10 text-slate-600 dark:text-slate-400">
             <Spinner size="lg" />
             <span className="ml-3 text-sm">Cargando tareas del workspace…</span>
           </div>
         ) : people.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-sm text-slate-400">
+          <p className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-6 text-sm text-slate-600 dark:text-slate-400">
             No hay tareas asignadas a personas en este workspace con los filtros actuales.
           </p>
         ) : (
@@ -184,7 +184,7 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
             {people.map((person) => (
               <Card
                 key={person.personId}
-                className="border border-slate-800 bg-slate-950/70 transition hover:border-cyan-500/60 hover:bg-slate-950/90 cursor-pointer"
+                className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 transition hover:border-cyan-500/60 hover:bg-slate-50 dark:hover:bg-slate-900/80 cursor-pointer"
                 onClick={() => {
                   if (onPersonClick) {
                     onPersonClick(person.personId === '__unassigned__' ? null : person.personId);
@@ -194,14 +194,14 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-white">{person.label}</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{person.label}</p>
                       <p className="text-xs text-slate-500">ID: {person.personId}</p>
                     </div>
                     <div className="flex gap-2 text-xs">
-                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-200">
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-700 dark:text-amber-200">
                         Pend: {person.pending}
                       </span>
-                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-emerald-200">
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-emerald-700 dark:text-emerald-200">
                         Comp: {person.completed}
                       </span>
                     </div>
@@ -219,13 +219,13 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
                       return (
                         <div
                           key={task.id}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-1"
+                          className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 px-2 py-1"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[13px] text-white">{task.title}</p>
+                            <p className="truncate text-[13px] text-slate-900 dark:text-white">{task.title}</p>
                             <p className="truncate text-[11px] text-slate-500">{projectLabel}</p>
                           </div>
-                          <div className="flex flex-col items-end gap-1 text-[11px] text-slate-400">
+                          <div className="flex flex-col items-end gap-1 text-[11px] text-slate-600 dark:text-slate-400">
                             <span
                               className={
                                 dueDate && !task.completed && dueDate.getTime() < Date.now()
@@ -255,3 +255,9 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
     </Card>
   );
 }
+
+
+
+
+
+

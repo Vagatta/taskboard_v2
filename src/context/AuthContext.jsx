@@ -6,7 +6,8 @@ const AuthContext = createContext(undefined);
 const initialState = {
   user: null,
   initializing: true,
-  error: null
+  error: null,
+  successMessage: null
 };
 
 export function AuthProvider({ children }) {
@@ -29,7 +30,21 @@ export function AuthProvider({ children }) {
           setState((prev) => ({ ...prev, error: error.message }));
         }
 
-        setState({ user: session?.user ?? null, initializing: false, error: error?.message ?? null });
+        // Verificar si el usuario tiene el email confirmado
+        const user = session?.user ?? null;
+        if (user && !user.email_confirmed_at) {
+          // Usuario no ha confirmado su email, cerrar sesión
+          await supabase.auth.signOut();
+          setState({
+            user: null,
+            initializing: false,
+            error: 'Debes verificar tu email antes de acceder. Revisa tu bandeja de entrada.',
+            successMessage: null
+          });
+          return;
+        }
+
+        setState({ user, initializing: false, error: error?.message ?? null, successMessage: null });
       } catch (error) {
         if (!isMounted) return;
         setState({ user: null, initializing: false, error: error instanceof Error ? error.message : String(error) });
@@ -56,26 +71,46 @@ export function AuthProvider({ children }) {
 
     if (error) {
       const message = handleSupabaseError(error, 'No se pudo iniciar sesión');
-      setState((prev) => ({ ...prev, error: message }));
+      setState((prev) => ({ ...prev, error: message, successMessage: null }));
       throw error;
     }
 
-    setState((prev) => ({ ...prev, error: null, user: data.user }));
+    // Verificar si el email está confirmado
+    if (data.user && !data.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      const message = 'Debes verificar tu email antes de acceder. Revisa tu bandeja de entrada.';
+      setState((prev) => ({ ...prev, error: message, user: null, successMessage: null }));
+      throw new Error(message);
+    }
+
+    setState((prev) => ({ ...prev, error: null, user: data.user, successMessage: null }));
     return data.user;
   };
 
   const signUp = async ({ email, password }) => {
     setAuthLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    // Configurar URL de redirección para el email de verificación
+    const redirectUrl = `${window.location.origin}${process.env.PUBLIC_URL || ''}`;
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
+    });
     setAuthLoading(false);
 
     if (error) {
       const message = handleSupabaseError(error, 'No se pudo crear la cuenta');
-      setState((prev) => ({ ...prev, error: message }));
+      setState((prev) => ({ ...prev, error: message, successMessage: null }));
       throw error;
     }
 
-    setState((prev) => ({ ...prev, error: null, user: data.user }));
+    // Mostrar mensaje de éxito y NO establecer usuario (requiere verificación)
+    const successMsg = '✓ Cuenta creada exitosamente. Revisa tu email para verificar tu cuenta antes de iniciar sesión.';
+    setState((prev) => ({ ...prev, error: null, user: null, successMessage: successMsg }));
     return data.user;
   };
 
@@ -86,11 +121,11 @@ export function AuthProvider({ children }) {
 
     if (error) {
       const message = handleSupabaseError(error, 'No se pudo cerrar sesión');
-      setState((prev) => ({ ...prev, error: message }));
+      setState((prev) => ({ ...prev, error: message, successMessage: null }));
       throw error;
     }
 
-    setState((prev) => ({ ...prev, user: null }));
+    setState((prev) => ({ ...prev, user: null, successMessage: null }));
   };
 
   const contextValue = useMemo(
@@ -98,13 +133,15 @@ export function AuthProvider({ children }) {
       user: state.user,
       initializing: state.initializing,
       error: state.error,
+      successMessage: state.successMessage,
       authLoading,
       signIn,
       signUp,
       signOut,
-      setError: (message) => setState((prev) => ({ ...prev, error: message }))
+      setError: (message) => setState((prev) => ({ ...prev, error: message, successMessage: null })),
+      setSuccessMessage: (message) => setState((prev) => ({ ...prev, successMessage: message, error: null }))
     }),
-    [state.user, state.initializing, state.error, authLoading]
+    [state.user, state.initializing, state.error, state.successMessage, authLoading]
   );
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
@@ -119,3 +156,5 @@ export function useAuth() {
 
   return context;
 }
+
+

@@ -146,7 +146,7 @@ export default function ActivityLog({ projectId, members = [] }) {
   }, [fromBoundary, projectId, selectedActions, selectedUser, toBoundary]);
 
   useEffect(() => {
-     loadLog();
+    loadLog();
   }, [loadLog]);
 
   useEffect(() => {
@@ -228,16 +228,16 @@ export default function ActivityLog({ projectId, members = [] }) {
           const member = membersById[log.actor_id];
           const meta = ACTION_META[log.event_type] ?? ACTION_META.default;
           return (
-            <div key={log.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <div key={log.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <Badge color={meta.color}>{meta.label}</Badge>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-slate-900 dark:text-white">
                   {member?.member_email ?? log.actor_id ?? 'Sistema'}
                 </span>
                 <span>{formatLocaleDate(log.created_at)}</span>
                 {log.task_id ? <span>Tarea #{log.task_id.slice(0, 8)}…</span> : null}
               </div>
-              <p className="mt-2 text-sm text-slate-100">{renderDetails(log)}</p>
+              <p className="mt-2 text-sm text-slate-900 dark:text-slate-100">{renderDetails(log)}</p>
             </div>
           );
         })}
@@ -246,11 +246,11 @@ export default function ActivityLog({ projectId, members = [] }) {
   }
 
   return (
-    <Card className="bg-slate-950/40">
+    <Card className="bg-slate-100 dark:bg-slate-950/60">
       <div className="flex max-h-[480px] flex-col gap-4 overflow-y-auto pr-2">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">Historial de actividad</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Historial de actividad</p>
             <p className="text-xs text-slate-500">Registra tareas, comentarios y asignaciones recientes.</p>
           </div>
           <div className="flex flex-col gap-1 text-xs text-slate-500 sm:text-right">
@@ -295,7 +295,7 @@ export default function ActivityLog({ projectId, members = [] }) {
             <span className="text-xs text-slate-500">Desde</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-sm text-white"
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-2 text-sm text-slate-900 dark:text-white"
               value={dateFrom}
               max={dateTo}
               onChange={(event) => {
@@ -308,7 +308,7 @@ export default function ActivityLog({ projectId, members = [] }) {
             <span className="text-xs text-slate-500">Hasta</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-sm text-white"
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-2 text-sm text-slate-900 dark:text-white"
               value={dateTo}
               min={dateFrom}
               onChange={(event) => {
@@ -332,7 +332,7 @@ export default function ActivityLog({ projectId, members = [] }) {
           </div>
           <div className="flex flex-wrap gap-4">
             {ACTION_OPTIONS.map((action) => (
-              <label key={action} className="flex items-center gap-2 text-xs text-slate-400">
+              <label key={action} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <Checkbox
                   checked={selectedActions.includes(action)}
                   onChange={() => toggleAction(action)}
@@ -364,3 +364,9 @@ ActivityLog.propTypes = {
     })
   )
 };
+
+
+
+
+
+
