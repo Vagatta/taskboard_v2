@@ -1,4 +1,4 @@
-import { Button, Tooltip } from 'flowbite-react';
+import { Tooltip } from 'flowbite-react';
 
 export default function ThemeToggle({ isDark, onToggle }) {
     return (
@@ -13,8 +13,8 @@ export default function ThemeToggle({ isDark, onToggle }) {
                 <span className="sr-only">Alternar tema</span>
                 <span
                     className={`flex h-7 w-7 transform items-center justify-center rounded-full shadow-sm transition-transform duration-300 ${isDark
-                            ? 'translate-x-7 bg-slate-900 text-yellow-300'
-                            : 'translate-x-0 bg-white text-orange-400'
+                        ? 'translate-x-7 bg-slate-900 text-yellow-300'
+                        : 'translate-x-0 bg-white text-orange-400'
                         }`}
                 >
                     {isDark ? (

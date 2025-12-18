@@ -1,4 +1,4 @@
-import { Card } from 'flowbite-react';
+import { Badge } from 'flowbite-react';
 
 export default function AppLayout({
   heading,
@@ -33,6 +33,14 @@ export default function AppLayout({
                     <a href={crumb.href} className="transition hover:text-slate-900 dark:hover:text-slate-200">
                       {crumb.label}
                     </a>
+                  ) : crumb.onClick ? (
+                    <button
+                      type="button"
+                      onClick={crumb.onClick}
+                      className="transition hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none"
+                    >
+                      {crumb.label}
+                    </button>
                   ) : (
                     <span className="text-slate-400 dark:text-slate-400">{crumb.label}</span>
                   )}
@@ -59,7 +67,12 @@ export default function AppLayout({
       {statusItems.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {statusItems.map((item) => (
-            <div key={item.label} className={`rounded-2xl border p-4 ${panelBorderClass}`}>
+            <div
+              key={item.label}
+              onClick={item.onClick}
+              className={`rounded-2xl border p-4 ${panelBorderClass} ${item.onClick ? 'cursor-pointer transition-transform hover:scale-[1.02] hover:shadow-md active:scale-[0.98]' : ''
+                }`}
+            >
               <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
               <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{item.value}</p>
               {item.helper ? <p className="text-xs text-slate-500 dark:text-slate-500">{item.helper}</p> : null}

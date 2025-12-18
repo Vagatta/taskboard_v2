@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Badge, Button, Card, Label, Select, Spinner, Tabs, TabItem, TextInput, ToggleSwitch } from 'flowbite-react';
+import { Alert, Button, Card, Label, Select, Spinner, TextInput } from 'flowbite-react';
 import './App.css';
 import AppLayout from './components/AppLayout';
 import WorkspaceManagementPanel from './components/WorkspaceManagementPanel';
@@ -10,6 +10,7 @@ import WorkspacePeopleDashboard from './components/WorkspacePeopleDashboard';
 import UserPanel from './components/UserPanel';
 import NotificationPanel from './components/NotificationPanel';
 import ThemeToggle from './components/ThemeToggle';
+import AcceptInvitation from './components/AcceptInvitation';
 import { useAuth } from './context/AuthContext';
 
 const navIcons = {
@@ -159,7 +160,6 @@ function App() {
     }
     return false; // Por defecto oscuro
   });
-  const [activeViewMode, setActiveViewMode] = useState('list');
   const [activeManagementTab, setActiveManagementTab] = useState('workspace');
   const [activePrimaryView, setActivePrimaryView] = useState('dashboard');
   const [statsWorkspaceId, setStatsWorkspaceId] = useState(null);
@@ -172,6 +172,17 @@ function App() {
     completedLate: 0
   });
   const taskListRef = useRef(null);
+
+  // Detectar si estamos en la página de aceptar invitación
+  const [invitationToken, setInvitationToken] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setInvitationToken(token);
+    }
+  }, []);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
@@ -328,11 +339,34 @@ function App() {
   }, []);
 
   const breadcrumbs = useMemo(() => {
-    const base = [{ label: 'Inicio', href: '#' }];
+    const base = [
+      {
+        label: 'Inicio',
+        onClick: () => {
+          setActivePrimaryView('dashboard');
+          setActiveManagementTab('workspace');
+        }
+      }
+    ];
+
     if (activeWorkspace) {
-      base.push({ label: activeWorkspace.name });
+      base.push({
+        label: activeWorkspace.name,
+        onClick: () => {
+          setActivePrimaryView('dashboard');
+          setActiveManagementTab('workspace');
+        }
+      });
     }
-    base.push({ label: 'Proyectos' });
+
+    base.push({
+      label: 'Proyectos',
+      onClick: () => {
+        setActivePrimaryView('dashboard');
+        setActiveManagementTab('proyectos');
+      }
+    });
+
     if (selectedProject) {
       base.push({ label: selectedProject.name });
     }
@@ -344,12 +378,24 @@ function App() {
       {
         label: 'Workspace activo',
         value: activeWorkspace ? activeWorkspace.name : 'Ninguno',
-        helper: activeWorkspace ? 'Gestionando proyectos compartidos' : 'Selecciona o crea uno'
+        helper: activeWorkspace ? 'Gestionando proyectos compartidos' : 'Selecciona o crea uno',
+        onClick: () => {
+          setActivePrimaryView('dashboard');
+          setActiveManagementTab('proyectos');
+        }
       },
       {
         label: 'Proyecto activo',
         value: selectedProject ? selectedProject.name : 'Ninguno',
-        helper: selectedProject ? 'Gestionando tareas' : 'Elige un proyecto'
+        helper: selectedProject ? 'Gestionando tareas' : 'Elige un proyecto',
+        onClick: () => {
+          setActivePrimaryView('dashboard');
+          if (selectedProject) {
+            setActiveManagementTab('tareas');
+          } else {
+            setActiveManagementTab('proyectos');
+          }
+        }
       }
     ],
     [activeWorkspace, selectedProject]
@@ -382,6 +428,11 @@ function App() {
         </Card>
       </div>
     );
+  }
+
+  // Si hay un token de invitación en la URL, mostrar la página de aceptación
+  if (invitationToken) {
+    return <AcceptInvitation />;
   }
 
   if (!user) {
@@ -573,6 +624,7 @@ function App() {
             onProjectSelect={handleProjectSelect}
             onProjectsChange={handleProjectsChange}
             onProjectMembersChange={handleProjectMembersChange}
+            workspaceMembers={workspaceMembers}
           />
         )}
         {activeManagementTab === 'tareas' && (
@@ -584,7 +636,7 @@ function App() {
             selectedProjectMembers={selectedProjectMembers}
             projects={projects}
             taskListRef={taskListRef}
-            onViewModeChange={setActiveViewMode}
+
             onTaskSummaryChange={setTaskSummary}
             assigneePreset={assigneePreset}
           />

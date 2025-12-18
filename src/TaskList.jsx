@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TabItem, Tabs } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Checkbox, Select, Spinner } from 'flowbite-react';
 import ActivityLog from './components/ActivityLog';
 import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
@@ -597,13 +597,7 @@ const TaskList = forwardRef(function TaskList(
 
   const timelineDayKeys = useMemo(() => timelineDays.map((day) => day.toISOString().split('T')[0]), [timelineDays]);
 
-  const timelineWeeks = useMemo(() => {
-    const weeks = [];
-    for (let index = 0; index < timelineDays.length; index += 7) {
-      weeks.push(timelineDays.slice(index, index + 7));
-    }
-    return weeks;
-  }, [timelineDays]);
+
 
   const timelineBuckets = useMemo(() => {
     const dayMap = timelineDayKeys.reduce((accumulator, key) => {
@@ -772,6 +766,111 @@ const TaskList = forwardRef(function TaskList(
       });
     },
     [recalcSubtaskStats, userId]
+  );
+
+  const handleGenerateSubtasks = useCallback(
+    async (task) => {
+      if (!task || !task.id) return;
+
+      const taskId = task.id;
+      setSubtasksLoadingMap((prev) => ({ ...prev, [taskId]: true }));
+      setSubtaskError('');
+
+      try {
+        const title = task.title || 'Tarea';
+        const description = task.description || '';
+
+        // --- GOOGLE GEMINI API CALL ---
+        // --- GOOGLE GEMINI API CALL (Updated) ---
+        const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
+
+        if (!API_KEY) {
+          throw new Error('Configuración incompleta: Falta la API Key de Gemini en el archivo .env');
+        }
+
+        // Using gemini-flash-latest (likely standard 1.5-flash alias) for better free tier support
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${API_KEY}`;
+
+        const prompt = `
+          Act as a project manager. Generate 3 to 5 concise, actionable subtasks for the following task:
+          Title: "${title}"
+          Description: "${description}"
+          
+          Return ONLY a raw JSON array of strings. Do not use Markdown code blocks. Do not add explanations.
+          Example: ["Analyze requirements", "Draft design", "Implement core logic"]
+        `;
+
+        let response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || 'Error communicating with Gemini AI');
+        }
+
+        const data = await response.json();
+
+        if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) {
+          throw new Error('Invalid response format from Gemini');
+        }
+
+        const rawText = data.candidates[0].content.parts[0].text;
+
+        // Clean up markdown code blocks if Gemini adds them despite instructions
+        const cleanedText = rawText.replace(/```json|```/g, '').trim();
+
+        let suggestions = [];
+        try {
+          suggestions = JSON.parse(cleanedText);
+        } catch (e) {
+          console.warn("Failed to parse JSON from AI, fallback to line splitting", rawText);
+          // Fallback: Split by newlines and remove list markers
+          suggestions = cleanedText
+            .split('\n')
+            .map(line => line.replace(/^[-*•\d.]+\s+/, '').trim())
+            .filter(line => line.length > 0)
+            .slice(0, 5);
+        }
+
+        if (!Array.isArray(suggestions) || suggestions.length === 0) {
+          throw new Error('No valid subtasks generated');
+        }
+
+        // --- INSERT INTO SUPABASE ---
+        const newSubtasks = suggestions.map((suggestion) => ({
+          task_id: taskId,
+          title: suggestion,
+          updated_by: userId
+        }));
+
+        const { data: insertedData, error: insertError } = await supabase
+          .from('task_subtasks')
+          .insert(newSubtasks)
+          .select();
+
+        if (insertError) throw insertError;
+
+        // --- UPDATE LOCAL STATE ---
+        setSubtasksByTaskId((previous) => {
+          const current = previous[taskId] ?? [];
+          const nextList = [...current, ...(insertedData ?? [])];
+          recalcSubtaskStats(taskId, nextList);
+          return { ...previous, [taskId]: nextList };
+        });
+
+      } catch (err) {
+        console.error("Error generating subtasks:", err);
+        setSubtaskError(err.message || 'Error al generar subtareas con IA.');
+      } finally {
+        setSubtasksLoadingMap((prev) => ({ ...prev, [taskId]: false }));
+      }
+    },
+    [userId, recalcSubtaskStats]
   );
 
   const handleToggleSubtask = useCallback(
@@ -1332,7 +1431,7 @@ const TaskList = forwardRef(function TaskList(
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
       setPendingTaskId(null);
     },
-    [projectId, user?.id]
+    [projectId, userId]
   );
 
   const renderListView = useMemo(() => {
@@ -2127,7 +2226,8 @@ const TaskList = forwardRef(function TaskList(
       taskCommentMeta,
       toggleTaskCompletion,
       updateTaskAssignee,
-      madridDateFormatter
+      madridDateFormatter,
+      userId
     ]
   );
 
@@ -2582,8 +2682,8 @@ const TaskList = forwardRef(function TaskList(
                   type="button"
                   onClick={() => setActiveTasksSection(tab.id)}
                   className={`flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-3 text-sm font-medium transition-colors ${isActive
-                      ? 'border-cyan-500 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400'
-                      : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300'
+                    ? 'border-cyan-500 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400'
+                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300'
                     }`}
                 >
                   {tab.icon}
@@ -2620,8 +2720,8 @@ const TaskList = forwardRef(function TaskList(
                         type="button"
                         onClick={() => setTaskToolsTab(tool.id)}
                         className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${isActive
-                            ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                            : 'border-slate-200 bg-white/50 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-300'
+                          ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                          : 'border-slate-200 bg-white/50 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-300'
                           }`}
                       >
                         {tool.icon}
@@ -2753,8 +2853,8 @@ const TaskList = forwardRef(function TaskList(
                           onClick={() => !isDisabled && setViewMode(tab.id)}
                           disabled={isDisabled}
                           className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${isActive
-                              ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                              : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
+                            ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                            : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
                             } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {tab.icon}
@@ -2798,6 +2898,7 @@ const TaskList = forwardRef(function TaskList(
                           onUpdateEpic={updateTaskEpic}
                           onUpdateEffort={updateTaskEpic ? undefined : undefined}
                           onToggleCompletion={toggleTaskCompletion}
+                          onGenerateSubtasks={handleGenerateSubtasks}
                         />
                       </div>
                     )}

@@ -8,7 +8,8 @@ export default function ProjectsManagementPanel({
   projects,
   onProjectSelect,
   onProjectsChange,
-  onProjectMembersChange
+  onProjectMembersChange,
+  workspaceMembers
 }) {
   return (
     <div className="space-y-6">
@@ -28,6 +29,7 @@ export default function ProjectsManagementPanel({
             onSelect={onProjectSelect}
             onProjectsChange={onProjectsChange}
             onProjectMembersChange={onProjectMembersChange}
+            workspaceMembers={workspaceMembers}
           />
           {projects.length === 0 ? (
             <div

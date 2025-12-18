@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Select, Tabs, TabItem, TextInput } from 'flowbite-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Badge, Button, Card, Select, TextInput, Toast } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWorkspaces, useWorkspaceMembers } from '../hooks/useSupabaseQueries';
+import Skeleton from './ui/Skeleton';
 
-// Selector de workspaces: lista espacios, permite crear nuevos e invitar gente.
+// Sector de workspaces: lista espacios, permite crear nuevos e invitar gente.
 export default function WorkspaceSelector({
   user,
   selectedWorkspaceId,
@@ -10,9 +13,48 @@ export default function WorkspaceSelector({
   onWorkspacesChange,
   onWorkspaceMembersChange
 }) {
-  const [workspaces, setWorkspaces] = useState([]);
-  const [membersByWorkspace, setMembersByWorkspace] = useState({});
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: workspaces = [], isLoading: loadingWorkspaces, error: workspacesError } = useWorkspaces(user);
+
+  // Fetch members for ALL workspaces efficiently? 
+  // The hook useWorkspaceMembers is single-workspace, but we can stick to loading active workspace members for now
+  // OR keep the "batch load" pattern but moved to a hook?
+  // Current UI displays members of *active* workspace.
+  // The "Invite" tab (in Project) needed *all* workspace members? No, just members of the ACTIVE workspace.
+  // Wait, the previous logic loaded members for ALL loaded workspaces to calculate `membershipRole`?
+  // My hook `useWorkspaces` already includes `membershipRole`!
+  // So I only need to fetch members for the *selected* workspace to display in the UI.
+
+  const { data: members = [], isLoading: loadingMembers } = useWorkspaceMembers(selectedWorkspaceId);
+
+  // Derive active workspace members map for compatibility or display
+  const activeWorkspaceMembers = members;
+
+  // Sync with App.js (Legacy compatibility)
+  // Prevent infinite loops by comparing stringified data
+  useEffect(() => {
+    if (workspaces) {
+      // Use a timeout to break render cycle? Or just check difference?
+      // Since App.js sets state, we must be careful.
+      // Let's blindly call it only if length differs or something simple for now, 
+      // but correct way is deep check or removing this sync pattern.
+      // We'll rely on the parent to handle "same content" checks if possible, 
+      // but here we can at least avoid calling it if it's strictly equal.
+      // Actually, let's use a ref to track last emitted string
+      onWorkspacesChange?.(workspaces);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(workspaces), onWorkspacesChange]);
+
+  useEffect(() => {
+    // We only have members for SELECTED workspace now.
+    // If App.js expects a map of { workspaceId: members[] }, we can construct it partially.
+    if (members && selectedWorkspaceId) {
+      onWorkspaceMembersChange?.({ [selectedWorkspaceId]: members });
+    }
+  }, [members, selectedWorkspaceId, onWorkspaceMembersChange]);
+
+
   const [error, setError] = useState('');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -20,113 +62,104 @@ export default function WorkspaceSelector({
   const [inviteRole, setInviteRole] = useState('editor');
   const [inviting, setInviting] = useState(false);
   const [activeTab, setActiveTab] = useState('workspaces');
+  const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
 
-  const activeWorkspaceMembers = useMemo(
-    () => (selectedWorkspaceId ? membersByWorkspace[selectedWorkspaceId] ?? [] : []),
-    [membersByWorkspace, selectedWorkspaceId]
-  );
-
-  const syncWorkspaces = useCallback(
-    (list) => {
-      setWorkspaces(list);
-      onWorkspacesChange?.(list);
-    },
-    [onWorkspacesChange]
-  );
-
-  const syncMembers = useCallback(
-    (map) => {
-      setMembersByWorkspace(map);
-      onWorkspaceMembersChange?.(map);
-    },
-    [onWorkspaceMembersChange]
-  );
-
-  // Carga los workspaces donde el usuario es miembro y sus miembros asociados.
-  const loadWorkspaces = useCallback(async () => {
-    if (!user?.id) {
-      syncWorkspaces([]);
-      syncMembers({});
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    const { data, error: membershipError } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role, workspaces(id,name,owner_id,created_at)')
-      .eq('user_id', user.id)
-      .order('workspaces(created_at)', { ascending: true });
-
-    if (membershipError) {
-      setError(membershipError.message);
-      setLoading(false);
-      return;
-    }
-
-    const workspaceList = (data ?? [])
-      .filter((entry) => entry.workspaces)
-      .map((entry) => ({
-        ...entry.workspaces,
-        membershipRole: entry.role
-      }));
-
-    syncWorkspaces(workspaceList);
-
-    const workspaceIds = workspaceList.map((workspace) => workspace.id);
-
-    if (workspaceIds.length === 0) {
-      syncMembers({});
-      setLoading(false);
-      return;
-    }
-
-    const { data: memberRows, error: memberError } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, user_id, role, profiles(email)')
-      .in('workspace_id', workspaceIds);
-
-    if (memberError) {
-      setError((prev) => prev || memberError.message);
-      setLoading(false);
-      return;
-    }
-
-    const memberMap = memberRows?.reduce((acc, row) => {
-      if (!acc[row.workspace_id]) {
-        acc[row.workspace_id] = [];
-      }
-
-      acc[row.workspace_id].push({
-        workspace_id: row.workspace_id,
-        member_id: row.user_id,
-        role: row.role,
-        member_email: row.profiles?.email ?? row.user_id
-      });
-      return acc;
-    }, {}) ?? {};
-
-    syncMembers(memberMap);
-    setLoading(false);
-  }, [syncMembers, syncWorkspaces, user?.id]);
-
+  // Auto-select logic
   useEffect(() => {
-    loadWorkspaces();
-  }, [loadWorkspaces]);
+    if (loadingWorkspaces) return;
 
-  useEffect(() => {
-    if (!workspaces.length) {
-      onSelect?.(null);
+    if (workspaces?.length === 0) {
+      if (selectedWorkspaceId !== null) onSelect?.(null);
       return;
     }
 
-    const exists = workspaces.some((workspace) => workspace.id === selectedWorkspaceId);
+    const exists = workspaces?.some((w) => w.id === selectedWorkspaceId);
     if (!selectedWorkspaceId || !exists) {
-      onSelect?.(workspaces[0].id);
+      if (workspaces && workspaces[0]) {
+        onSelect?.(workspaces[0].id);
+      }
     }
-  }, [onSelect, selectedWorkspaceId, workspaces]);
+  }, [loadingWorkspaces, workspaces, selectedWorkspaceId, onSelect]);
+
+  // NUEVO: Estado para invitaciones RECIBIDAS por el usuario actual
+  const [myInvitations, setMyInvitations] = useState([]);
+  const [myProjectInvitations, setMyProjectInvitations] = useState([]);
+
+
+  // Estado para notificaciones tipo Toast
+  const [notification, setNotification] = useState(null);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 5000);
+  };
+
+  useEffect(() => {
+    loadMyPendingInvitations();
+  }, [loadMyPendingInvitations]);
+
+  // Cargar invitaciones donde el usuario actual es el destinatario (email coincide)
+  const loadMyPendingInvitations = useCallback(async () => {
+    console.log('Cargando invitaciones para:', user?.email);
+    if (!user?.email) return;
+
+    try {
+      // Usamos el RPC seguro para evitar problemas de RLS y recursión
+      const { data: wsData, error: wsError } = await supabase.rpc('get_my_pending_invitations');
+      const { data: projData, error: projError } = await supabase.rpc('get_my_pending_project_invitations');
+
+      console.log('Respuesta RPC invitaciones:', { wsData, projData, wsError, projError });
+
+      if (wsError) throw wsError;
+      if (projError) throw projError;
+
+      setMyInvitations(wsData ?? []);
+      setMyProjectInvitations(projData ?? []);
+    } catch (err) {
+      console.error('Error cargando mis invitaciones:', err);
+    }
+  }, [user?.email]);
+
+  const handleAcceptMyself = async (token) => {
+    try {
+      const { data, error } = await supabase.rpc('accept_invitation_by_token', { token_input: token });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+
+      showNotification('¡Te has unido al workspace correctamente!', 'success');
+      // Recargar todo
+      await queryClient.invalidateQueries(['workspaces', user?.id]);
+      await loadMyPendingInvitations();
+
+      // Seleccionar el nuevo workspace
+      if (data.workspace_id) {
+        onSelect?.(data.workspace_id);
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Error al unirse: ' + (err.message || 'Error desconocido'), 'failure');
+    }
+  };
+
+  const handleAcceptProjectMyself = async (token) => {
+    try {
+      const { data, error } = await supabase.rpc('accept_project_invitation_by_token', { token_input: token });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+
+      showNotification('¡Te has unido al proyecto correctamente!', 'success');
+      await queryClient.invalidateQueries(['workspaces', user?.id]);
+      await loadMyPendingInvitations();
+    } catch (err) {
+      console.error(err);
+      showNotification('Error al unirse al proyecto: ' + (err.message || 'Error desconocido'), 'failure');
+    }
+  };
+
+
 
   const handleCreateWorkspace = async (event) => {
     event.preventDefault();
@@ -159,12 +192,41 @@ export default function WorkspaceSelector({
       });
 
       setNewWorkspaceName('');
-      await loadWorkspaces();
+      queryClient.invalidateQueries(['workspaces']);
       onSelect?.(workspace.id);
     }
 
     setCreating(false);
   };
+
+  // Cargar invitaciones pendientes del workspace actual
+  const loadPendingInvitations = useCallback(async () => {
+    if (!selectedWorkspaceId) {
+      setPendingInvitations([]);
+      return;
+    }
+
+    setLoadingInvitations(true);
+    try {
+      const { data, error: invError } = await supabase
+        .from('workspace_invitations')
+        .select('*')
+        .eq('workspace_id', selectedWorkspaceId)
+        .is('accepted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (invError) throw invError;
+      setPendingInvitations(data ?? []);
+    } catch (err) {
+      console.error('Error cargando invitaciones:', err);
+    } finally {
+      setLoadingInvitations(false);
+    }
+  }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    loadPendingInvitations();
+  }, [loadPendingInvitations]);
 
   const handleInvite = async (event) => {
     event.preventDefault();
@@ -176,45 +238,118 @@ export default function WorkspaceSelector({
     setError('');
 
     try {
-      const { data: profile, error: profileError } = await supabase
+      // Primero verificar si el usuario ya existe
+      const { data: profile } = await supabase
         .from('profiles')
         .select('id,email')
         .eq('email', inviteEmail.trim())
         .maybeSingle();
 
-      if (profileError) {
-        throw profileError;
-      }
+      // Si el usuario ya existe, agregarlo directamente al workspace
+      if (profile) {
+        const { error: upsertError } = await supabase
+          .from('workspace_members')
+          .upsert(
+            {
+              workspace_id: selectedWorkspaceId,
+              user_id: profile.id,
+              role: inviteRole
+            },
+            { onConflict: 'workspace_id,user_id' }
+          );
 
-      if (!profile) {
-        setError('No se encontró un usuario con ese email.');
+        if (upsertError) throw upsertError;
+
+        setInviteEmail('');
+        setInviteRole('editor');
+        setInviteRole('editor');
+        // await loadWorkspaces(); Not needed if we just added a member? 
+        // Need to invalidate pending invitations or members?
+        queryClient.invalidateQueries(['workspaceMembers', selectedWorkspaceId]);
+        setError('');
+        setError('');
         return;
       }
 
-      const { error: upsertError } = await supabase
-        .from('workspace_members')
-        .upsert(
-          {
-            workspace_id: selectedWorkspaceId,
-            user_id: profile.id,
-            role: inviteRole
-          },
-          { onConflict: 'workspace_id,user_id' }
-        );
+      // Si no existe, crear invitación
+      const { data: invitation, error: inviteError } = await supabase
+        .from('workspace_invitations')
+        .insert({
+          workspace_id: selectedWorkspaceId,
+          email: inviteEmail.trim(),
+          role: inviteRole,
+          invited_by: user.id
+        })
+        .select()
+        .single();
 
-      if (upsertError) {
-        throw upsertError;
+      if (inviteError) {
+        if (inviteError.code === '23505') { // Unique constraint violation
+          throw new Error('Ya existe una invitación pendiente para este email.');
+        }
+        throw inviteError;
       }
+
+      // Obtener información del workspace para el email
+
+
+      // Enviar email de invitación automáticamente
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+
+        if (supabaseUrl && session?.access_token) {
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-invitation-email`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ invitationId: invitation.id })
+          });
+
+          if (response.ok) {
+            console.log('Email de invitación enviado automáticamente');
+          } else {
+            console.warn('No se pudo enviar el email automáticamente');
+          }
+        }
+      } catch (emailError) {
+        console.error('Error enviando email:', emailError);
+        // No bloqueamos el flujo si falla el email
+      }
+
+      // Generar enlace para mostrar al usuario (backup)
+      // Usar PUBLIC_URL que incluye /Taskboard del package.json
+      const baseUrl = `${window.location.origin}${process.env.PUBLIC_URL || ''}`;
+      const inviteUrl = `${baseUrl}/?token=${invitation.token}`;
+
+      console.log('Enlace de invitación generado:', inviteUrl);
+      showNotification(`Invitación creada. Email enviado a ${invitation.email}`, 'success');
 
       setInviteEmail('');
       setInviteRole('editor');
-      await loadWorkspaces();
+      await loadPendingInvitations();
     } catch (inviteError) {
       if (inviteError instanceof Error) {
         setError(inviteError.message);
       }
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId) => {
+    try {
+      const { error } = await supabase
+        .from('workspace_invitations')
+        .delete()
+        .eq('id', invitationId);
+
+      if (error) throw error;
+      await loadPendingInvitations();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -228,8 +363,8 @@ export default function WorkspaceSelector({
             <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Espacios de trabajo</h2>
             <p className="text-sm text-slate-600 dark:text-slate-400">Organiza proyectos por workspace e invita a tu equipo.</p>
           </div>
-          <Button color="dark" onClick={loadWorkspaces} disabled={loading}>
-            {loading ? 'Actualizando...' : 'Actualizar'}
+          <Button color="dark" onClick={() => queryClient.invalidateQueries(['workspaces'])} disabled={loadingWorkspaces}>
+            {loadingWorkspaces ? 'Actualizando...' : 'Actualizar'}
           </Button>
         </header>
 
@@ -238,6 +373,60 @@ export default function WorkspaceSelector({
             {error}
           </Alert>
         ) : null}
+
+        {/* SECCIÓN DE INVITACIONES RECIBIDAS */}
+        {myInvitations.length > 0 && (
+          <div className="mb-4 space-y-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-800 dark:bg-cyan-900/20">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-cyan-800 dark:text-cyan-200">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-200 text-xs text-cyan-900">!</span>
+              Invitaciones para ti ({myInvitations.length})
+            </h3>
+            <div className="space-y-2">
+              {myInvitations.map((inv) => (
+                <div key={inv.id} className="flex flex-col gap-2 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      Te han invitado al workspace: <strong>{inv.workspace_name}</strong>
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Rol: {inv.role} • Expira: {new Date(inv.expires_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button size="xs" color="success" onClick={() => handleAcceptMyself(inv.token)}>
+                    Aceptar y Unirme
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SECCIÓN DE INVITACIONES A PROYECTOS RECIBIDAS */}
+        {myProjectInvitations.length > 0 && (
+          <div className="mb-4 space-y-3 rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-200 text-xs text-purple-900">!</span>
+              Invitaciones a Proyectos ({myProjectInvitations.length})
+            </h3>
+            <div className="space-y-2">
+              {myProjectInvitations.map((inv) => (
+                <div key={inv.id} className="flex flex-col gap-2 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      Te han invitado al proyecto: <strong>{inv.project_name}</strong>
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Workspace: {inv.workspace_name} • Rol: {inv.role}
+                    </p>
+                  </div>
+                  <Button size="xs" color="purple" onClick={() => handleAcceptProjectMyself(inv.token)}>
+                    Aceptar y Unirme
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="border border-slate-200 dark:border-slate-800 rounded-xl bg-white/50 dark:bg-slate-950/30 p-2">
           <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
@@ -275,8 +464,8 @@ export default function WorkspaceSelector({
                   onClick={() => !isDisabled && setActiveTab(tab.id)}
                   disabled={isDisabled}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${isActive
-                      ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                      : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                    : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                     } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {tab.icon}
@@ -289,14 +478,23 @@ export default function WorkspaceSelector({
           <div className="animate-in fade-in slide-in-from-left-1 duration-300">
             {activeTab === 'workspaces' && (
               <div className="mt-4 space-y-3">
-                {workspaces.length === 0 ? (
+                {workspacesError && (
+                  <Alert color="failure">{workspacesError.message}</Alert>
+                )}
+
+                {loadingWorkspaces ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                ) : workspaces?.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-6 text-sm text-slate-600 dark:text-slate-400">
                     Aún no tienes workspaces. Crea uno para comenzar.
                   </div>
                 ) : (
                   <>
                     <Select value={selectedWorkspaceId ?? ''} onChange={(event) => onSelect?.(event.target.value)}>
-                      {workspaces.map((workspace) => (
+                      {workspaces?.map((workspace) => (
                         <option key={workspace.id} value={workspace.id}>
                           {workspace.name} ({workspace.membershipRole})
                         </option>
@@ -311,7 +509,12 @@ export default function WorkspaceSelector({
                           </div>
                           <Badge color="info">{activeWorkspaceMembers.length} miembros</Badge>
                         </div>
-                        {activeWorkspaceMembers.length > 0 ? (
+                        {loadingMembers ? (
+                          <div className="mt-3 flex gap-2">
+                            <Skeleton className="h-5 w-20 rounded-full" />
+                            <Skeleton className="h-5 w-20 rounded-full" />
+                          </div>
+                        ) : activeWorkspaceMembers.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {activeWorkspaceMembers.map((member) => (
                               <Badge
@@ -404,8 +607,80 @@ export default function WorkspaceSelector({
                       </Button>
                     </form>
                     <p className="text-xs text-slate-500">
-                      El usuario debe existir en `profiles`. Puedes enviar un enlace o email externo para que se registre primero.
+                      Si el usuario ya está registrado, se agregará directamente. Si no, recibirá una invitación por email.
                     </p>
+
+                    {/* Lista de invitaciones pendientes */}
+                    {loadingInvitations ? (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-slate-500">Cargando invitaciones...</p>
+                      </div>
+                    ) : pendingInvitations.length > 0 ? (
+                      <div className="mt-6 space-y-3">
+                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                          Invitaciones Pendientes ({pendingInvitations.length})
+                        </h3>
+                        <div className="space-y-2">
+                          {pendingInvitations.map((invitation) => {
+                            const expiresAt = new Date(invitation.expires_at);
+                            const isExpired = expiresAt < new Date();
+                            const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+
+                            return (
+                              <div
+                                key={invitation.id}
+                                className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+                              >
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                                    {invitation.email}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge color={invitation.role === 'owner' ? 'purple' : invitation.role === 'editor' ? 'info' : 'gray'} size="xs">
+                                      {invitation.role}
+                                    </Badge>
+                                    {isExpired ? (
+                                      <span className="text-xs text-red-600 dark:text-red-400">Expirada</span>
+                                    ) : (
+                                      <span className="text-xs text-slate-500">
+                                        Expira en {daysUntilExpiry} {daysUntilExpiry === 1 ? 'día' : 'días'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="xs"
+                                    color="light"
+                                    onClick={() => {
+                                      const baseUrl = `${window.location.origin}${process.env.PUBLIC_URL || ''}`;
+                                      const inviteUrl = `${baseUrl}/?token=${invitation.token}`;
+                                      navigator.clipboard.writeText(inviteUrl);
+                                      showNotification('Enlace copiado al portapapeles', 'success');
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    color="failure"
+                                    onClick={() => handleCancelInvitation(invitation.id)}
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-4">No hay invitaciones pendientes.</p>
+                    )}
                   </>
                 ) : (
                   <p className="text-xs text-slate-500">Selecciona primero un workspace para poder invitar miembros.</p>
@@ -414,6 +689,31 @@ export default function WorkspaceSelector({
             )}
           </div>
         </div>
+
+
+        {/* TOAST NOTIFICATIONS */}
+        {notification && (
+          <div className="fixed bottom-5 right-5 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <Toast>
+              <div className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${notification.type === 'success'
+                ? 'bg-green-100 text-green-500 dark:bg-green-800 dark:text-green-200'
+                : 'bg-red-100 text-red-500 dark:bg-red-800 dark:text-red-200'
+                }`}>
+                {notification.type === 'success' ? (
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 text-sm font-normal">{notification.message}</div>
+              <Toast.Toggle onDismiss={() => setNotification(null)} />
+            </Toast>
+          </div>
+        )}
       </div>
     </Card>
   );

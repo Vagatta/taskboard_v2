@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TabItem, Tabs, TextInput, Tooltip } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Checkbox, Select, Spinner, TextInput, Tooltip } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 import TaskComments from './TaskComments';
 import { formatRelativeTime, humanizeEventType } from '../utils/dateHelpers';
@@ -27,7 +27,8 @@ export default function TaskDetailPanel({
   onUpdateTags,
   onUpdateEpic,
   onUpdateEffort,
-  onToggleCompletion
+  onToggleCompletion,
+  onGenerateSubtasks
 }) {
   const [newSubtask, setNewSubtask] = useState('');
   const [creatingSubtask, setCreatingSubtask] = useState(false);
@@ -531,6 +532,7 @@ export default function TaskDetailPanel({
                     onNewSubtaskChange={setNewSubtask}
                     onCreateSubtask={handleCreateSubtask}
                     membersById={membersById}
+                    onGenerateSubtasks={() => onGenerateSubtasks && onGenerateSubtasks(task)}
                   />
                 </div>
               )}
@@ -846,7 +848,8 @@ function TaskSubtasksSection({
   newSubtask,
   onNewSubtaskChange,
   onCreateSubtask,
-  membersById
+  membersById,
+  onGenerateSubtasks
 }) {
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
@@ -857,6 +860,7 @@ function TaskSubtasksSection({
         canRefreshSubtasks={canRefreshSubtasks}
         onRefreshClick={onRefreshClick}
         refreshingSubtasks={refreshingSubtasks}
+        onGenerateSubtasks={onGenerateSubtasks}
       />
 
       {/* Subtareas sencillas pero útiles para romper trabajo grande en piezas manejables */}
@@ -885,7 +889,8 @@ function SubtasksHeader({
   subtasksLoading,
   canRefreshSubtasks,
   onRefreshClick,
-  refreshingSubtasks
+  refreshingSubtasks,
+  onGenerateSubtasks
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -898,6 +903,16 @@ function SubtasksHeader({
         </p>
       </div>
       <div className="flex items-center gap-2 text-xs">
+        <Button
+          size="xs"
+          color="purple"
+          onClick={onGenerateSubtasks}
+          disabled={subtasksLoading || refreshingSubtasks}
+          title="Generar subtareas automáticamente con IA"
+          className="mr-1"
+        >
+          Generar con IA
+        </Button>
         <Button
           size="xs"
           color="light"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Card, Select, Spinner } from 'flowbite-react';
+import { Alert, Card, Select, Spinner } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 import { formatRelativeTime } from '../utils/dateHelpers';
 

@@ -1,4 +1,4 @@
-# 📋 Taskboard
+# Taskboard
 
 > **Sistema de gestión de tareas colaborativo con workspaces, proyectos y seguimiento en tiempo real**
 
@@ -7,21 +7,21 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.17-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Flowbite](https://img.shields.io/badge/Flowbite-3.1.2-1C64F2?style=flat&logo=flowbite&logoColor=white)](https://flowbite.com/)
 
-## ✨ Características
+## Características
 
-### 🏢 Gestión de Workspaces
+### Gestión de Workspaces
 - **Creación y administración** de espacios de trabajo colaborativos
 - **Invitación de miembros** mediante email
 - **Control de permisos** por workspace
 - **Dashboard de estadísticas** por workspace
 
-### 📁 Proyectos
+### Proyectos
 - **Organización jerárquica**: Workspaces → Proyectos → Tareas
 - **Asignación de colaboradores** específicos por proyecto
 - **Seguimiento de progreso** en tiempo real
 - **Múltiples vistas**: Lista, Kanban, Secciones
 
-### ✅ Gestión de Tareas
+### Gestión de Tareas
 - **Creación rápida** con atajos de teclado (`Ctrl+G`)
 - **Asignación de responsables** y fechas límite
 - **Sistema de prioridades** (Alta, Media, Baja)
@@ -29,26 +29,26 @@
 - **Comentarios y menciones** (`@usuario`)
 - **Registro de actividad** completo
 
-### 🎨 Interfaz Moderna
+### Interfaz Moderna
 - **Tema claro/oscuro** con transiciones suaves
 - **Diseño responsive** para móvil, tablet y desktop
 - **Animaciones fluidas** con Tailwind CSS
 - **Componentes accesibles** con Flowbite React
 - **Glassmorphism** y efectos visuales modernos
 
-### 🔔 Notificaciones
+### Notificaciones
 - **Centro de notificaciones** integrado
 - **Menciones en comentarios** con alertas
 - **Resumen de actividad** por workspace
 - **Notificaciones en tiempo real** vía Supabase Realtime
 
-### 📊 Estadísticas y Reportes
+### Estadísticas y Reportes
 - **Métricas de productividad** por usuario
 - **Tareas completadas a tiempo** vs fuera de plazo
 - **Distribución de carga** entre colaboradores
 - **Gráficos visuales** de progreso
 
-## 🚀 Tecnologías
+## Tecnologías
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -59,7 +59,7 @@
 | **Build** | React Scripts | 5.0.1 |
 | **Testing** | Testing Library | 16.3.0 |
 
-## 📦 Instalación
+## Instalación
 
 ### Prerrequisitos
 - Node.js 16+ y npm/yarn
@@ -96,7 +96,7 @@ npm start
 
 La aplicación estará disponible en `http://localhost:3000`
 
-## 🏗️ Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 taskboard_v2/
@@ -126,7 +126,7 @@ taskboard_v2/
 └── README.md
 ```
 
-## 🎯 Uso
+## Uso
 
 ### Primeros pasos
 1. **Registrarse**: Crea una cuenta con email y contraseña
@@ -142,11 +142,11 @@ taskboard_v2/
 | `Ctrl+V` | Cambiar vista (Lista/Kanban/Secciones) |
 
 ### Vistas disponibles
-- **📝 Lista**: Vista tradicional con filtros y búsqueda
-- **📊 Kanban**: Tablero visual por estados
-- **🗂️ Secciones**: Organización por secciones personalizadas
+- **Lista**: Vista tradicional con filtros y búsqueda
+- **Kanban**: Tablero visual por estados
+- **Secciones**: Organización por secciones personalizadas
 
-## 🔐 Autenticación
+## Autenticación
 
 El sistema utiliza **Supabase Auth** con:
 - ✅ Email/Contraseña
@@ -155,7 +155,7 @@ El sistema utiliza **Supabase Auth** con:
 - ✅ Sesiones persistentes
 - ✅ Row Level Security (RLS)
 
-## 🌐 Despliegue
+## Despliegue
 
 ### Build de producción
 ```bash
@@ -178,7 +178,7 @@ El archivo `public/.htaccess` incluye configuración para:
 - Caché de assets estáticos
 - Compresión GZIP
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Ejecutar tests
@@ -188,14 +188,14 @@ npm test
 npm test -- --coverage
 ```
 
-## 📝 Documentación adicional
+## Documentación adicional
 
 - [DOCUMENTACION_APP.md](./DOCUMENTACION_APP.md) - Documentación técnica completa
 - [Supabase Docs](https://supabase.com/docs)
 - [React Docs](https://react.dev/)
 - [Tailwind CSS Docs](https://tailwindcss.com/docs)
 
-## 🤝 Contribuir
+## Contribuir
 
 Las contribuciones son bienvenidas. Por favor:
 
@@ -205,16 +205,16 @@ Las contribuciones son bienvenidas. Por favor:
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto es de código privado. Todos los derechos reservados.
 
-## 👤 Autor
+## Autor
 
 **Vagatta**
 - GitHub: [@Vagatta](https://github.com/Vagatta)
 
-## 🙏 Agradecimientos
+## Agradecimientos
 
 - [Supabase](https://supabase.com/) - Backend as a Service
 - [Flowbite](https://flowbite.com/) - Componentes UI
@@ -223,4 +223,4 @@ Este proyecto es de código privado. Todos los derechos reservados.
 
 ---
 
-⭐ Si este proyecto te resulta útil, considera darle una estrella en GitHub!
+Si este proyecto te resulta útil, considera darle una estrella
