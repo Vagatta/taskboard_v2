@@ -96,3 +96,163 @@
 :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.35);
 }
+
+/* Splash Screen Styles */
+.splash-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  /* Default: Dark theme colors */
+  background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+  color: white;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* Light theme support */
+.splash-container.light {
+  background: radial-gradient(circle at center, #f8fafc 0%, #e2e8f0 100%);
+  color: #1e293b;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  animation: splash-in 1s ease-out forwards;
+}
+
+.splash-logo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-logo-glow {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: rgba(14, 165, 233, 0.2);
+  filter: blur(40px);
+  border-radius: 50%;
+  animation: pulse-glow 2s infinite alternate ease-in-out;
+}
+
+.splash-container.light .splash-logo-glow {
+  background: rgba(14, 165, 233, 0.15);
+}
+
+.splash-logo {
+  width: 80px;
+  height: 80px;
+  color: #0ea5e9;
+  z-index: 10;
+  filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.5));
+}
+
+.splash-text {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.5em;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+  opacity: 0;
+  transform: translateY(10px);
+  animation: text-reveal 0.8s 0.5s ease-out forwards;
+}
+
+.splash-container.light .splash-text {
+  color: rgba(30, 41, 59, 0.8);
+}
+
+.splash-loading-bar {
+  width: 180px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+  opacity: 0;
+  animation: fade-in 0.5s 1s ease-out forwards;
+}
+
+.splash-container.light .splash-loading-bar {
+  background: rgba(30, 41, 59, 0.1);
+}
+
+.splash-loading-progress {
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, #0ea5e9, transparent);
+  animation: loading-bar-move 1.5s infinite ease-in-out;
+}
+
+@keyframes splash-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  from {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+
+  to {
+    transform: scale(1.4);
+    opacity: 0.4;
+  }
+}
+
+@keyframes text-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loading-bar-move {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Exit animation for the splash screen */
+.fade-out-splash {
+  animation: splash-exit 0.6s ease-in forwards !important;
+}
+
+@keyframes splash-exit {
+  to {
+    opacity: 0;
+    transform: scale(1.05);
+    filter: blur(10px);
+    pointer-events: none;
+  }
+}

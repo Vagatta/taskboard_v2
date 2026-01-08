@@ -232,10 +232,14 @@ export default function ActivityLog({ projectId, members = [] }) {
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <Badge color={meta.color}>{meta.label}</Badge>
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  {member?.member_email ?? log.actor_id ?? 'Sistema'}
+                  {member?.member_email ?? (log.actor_id ? 'Colaborador' : 'Sistema')}
                 </span>
                 <span>{formatLocaleDate(log.created_at)}</span>
-                {log.task_id ? <span>Tarea #{log.task_id.slice(0, 8)}…</span> : null}
+                {log.payload?.title ? (
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Tarea: {log.payload.title}</span>
+                ) : log.task_id ? (
+                  <span>Tarea #{log.task_id.slice(0, 8)}…</span>
+                ) : null}
               </div>
               <p className="mt-2 text-sm text-slate-900 dark:text-slate-100">{renderDetails(log)}</p>
             </div>
@@ -249,13 +253,14 @@ export default function ActivityLog({ projectId, members = [] }) {
     <Card className="bg-slate-100 dark:bg-slate-950/60">
       <div className="flex max-h-[480px] flex-col gap-4 overflow-y-auto pr-2">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-semibold text-slate-900 dark:text-white">Historial de actividad</p>
             <p className="text-xs text-slate-500">Registra tareas, comentarios y asignaciones recientes.</p>
           </div>
-          <div className="flex flex-col gap-1 text-xs text-slate-500 sm:text-right">
-            <span>Rango rápido</span>
+          <div className="flex flex-col gap-2 text-xs text-slate-500 sm:items-end sm:text-right">
+            <span className="font-medium">Rango rápido</span>
             <Select
+              sizing="sm"
               value={typeof rangeDays === 'number' ? String(rangeDays) : 'custom'}
               onChange={(event) => {
                 const value = event.target.value;
@@ -279,10 +284,10 @@ export default function ActivityLog({ projectId, members = [] }) {
           </div>
         </header>
 
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr]">
+        <div className="grid gap-3 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">Usuario</span>
-            <Select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
+            <span className="text-xs font-medium text-slate-500">Usuario</span>
+            <Select sizing="sm" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
               <option value="all">Todos</option>
               {members.map((member) => (
                 <option key={member.member_id} value={member.member_id}>
@@ -292,10 +297,10 @@ export default function ActivityLog({ projectId, members = [] }) {
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">Desde</span>
+            <span className="text-xs font-medium text-slate-500">Desde</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-2 text-sm text-slate-900 dark:text-white"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
               value={dateFrom}
               max={dateTo}
               onChange={(event) => {
@@ -305,10 +310,10 @@ export default function ActivityLog({ projectId, members = [] }) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">Hasta</span>
+            <span className="text-xs font-medium text-slate-500">Hasta</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-2 text-sm text-slate-900 dark:text-white"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
               value={dateTo}
               min={dateFrom}
               onChange={(event) => {

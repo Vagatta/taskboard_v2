@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, Select, Spinner } from 'flowbite-react';
+import DailyFlash from './components/DailyFlash';
 import ActivityLog from './components/ActivityLog';
 import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
@@ -8,15 +9,28 @@ import TaskKanbanBoard from './components/TaskKanbanBoard';
 import TaskCreatePanel from './components/TaskCreatePanel';
 import TaskFiltersPanel from './components/TaskFiltersPanel';
 import { supabase } from './supabaseClient';
-import { formatRelativeTime, humanizeEventType, parseDateInput } from './utils/dateHelpers';
+import { playSuccessSound } from './utils/audioHelpers';
+import { calculateStreak, formatRelativeTime, humanizeEventType, parseDateInput } from './utils/dateHelpers';
+import confetti from 'canvas-confetti';
 
 // Vista principal del tablero: lista, kanban, filtros, detalles y todo lo que pasa alrededor de las tareas.
 const TaskList = forwardRef(function TaskList(
-  { user, projectId, project, members = [], workspaceId = null, assigneePreset = null, onViewModeChange, onTaskSummaryChange },
+  { user, projectId, project, members = [], workspaceId = null, assigneePreset = null, onViewModeChange, onTaskSummaryChange, initialTaskId = null },
   ref
 ) {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
+
+
+  const [showDailyFlash, setShowDailyFlash] = useState(false);
+  const lastProjectRef = useRef(null);
+
+  useEffect(() => {
+    if (projectId && projectId !== lastProjectRef.current) {
+      setShowDailyFlash(true);
+      lastProjectRef.current = projectId;
+    }
+  }, [projectId]);
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('medium');
   const [newTaskEffort, setNewTaskEffort] = useState('m');
@@ -60,9 +74,66 @@ const TaskList = forwardRef(function TaskList(
   const [subtaskError, setSubtaskError] = useState('');
   const [mentionedTaskIds, setMentionedTaskIds] = useState(new Set());
   const [isCalendarFullscreen, setIsCalendarFullscreen] = useState(false);
+  const [projectViewers, setProjectViewers] = useState([]);
 
   const userId = user?.id ?? null;
   const userEmail = user?.email ?? null;
+
+  const loadTasks = useCallback(async () => {
+    if (!userId || !projectId) {
+      setTasks([]);
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    const baseQuery = () =>
+      supabase
+        .from('tasks')
+        .select(
+          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,updated_by,updated_at,priority,effort,tags,epic'
+        )
+        .eq('project_id', projectId)
+        .order('inserted_at', { ascending: false });
+
+    const fallbackQuery = () =>
+      supabase
+        .from('tasks')
+        .select('id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,due_date,priority')
+        .eq('project_id', projectId)
+        .order('inserted_at', { ascending: false });
+
+    try {
+      let { data, error } = await baseQuery();
+
+      if (error) {
+        if (error.code === '42703') {
+          const { data: fallbackData, error: fallbackError } = await fallbackQuery();
+          if (fallbackError) {
+            setErrorMessage(fallbackError.message);
+            return;
+          }
+          setTasks(fallbackData ?? []);
+          return;
+        }
+
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setTasks(data ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, userId]);
+
+  const productivityStreak = useMemo(() => {
+    const dates = tasks
+      .filter((t) => t.completed && t.completed_at && t.assigned_to === userId)
+      .map((t) => t.completed_at);
+    return calculateStreak(dates);
+  }, [tasks, userId]);
 
   const isEmpty = useMemo(() => !loading && projectId && tasks.length === 0, [loading, projectId, tasks.length]);
 
@@ -80,6 +151,16 @@ const TaskList = forwardRef(function TaskList(
     setTaskToolsTab('search');
     setShowFilters(true);
   }, [assigneePreset]);
+
+  // Si se proporciona un ID de tarea inicial (navegación desde el dashboard), la abrimos automáticamente.
+  useEffect(() => {
+    if (initialTaskId && tasks.length > 0) {
+      const task = tasks.find((t) => t.id === initialTaskId);
+      if (task) {
+        setSelectedTaskDetail(task);
+      }
+    }
+  }, [initialTaskId, tasks]);
 
   const projectOwnerLabel = useMemo(() => {
     if (!project) return 'Desconocido';
@@ -198,11 +279,59 @@ const TaskList = forwardRef(function TaskList(
   const dueBeforeDate = useMemo(() => parseDateInput(dueBeforeFilter, { endOfDay: true }), [dueBeforeFilter]);
   const completedBeforeDate = useMemo(() => parseDateInput(completedBeforeFilter, { endOfDay: true }), [completedBeforeFilter]);
 
+  // Presencia en tiempo real en el proyecto.
+  useEffect(() => {
+    if (!userId || !projectId) {
+      return undefined;
+    }
+
+    const channelId = `project_presence_${projectId} `;
+    const channel = supabase.channel(channelId, {
+      config: {
+        presence: {
+          key: userId,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const others = [];
+
+        Object.entries(state).forEach(([key, sessions]) => {
+          if (!Array.isArray(sessions) || sessions.length === 0) {
+            return;
+          }
+          const session = sessions[0];
+          others.push({
+            userId: key,
+            ...session
+          });
+        });
+
+        setProjectViewers(others);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            user_id: userId,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+      setProjectViewers([]);
+    };
+  }, [userId, projectId]);
+
   const filterStorageKey = useMemo(() => {
     if (!userId || !projectId) {
       return null;
     }
-    return `taskboard:filters:${userId}:${projectId}`;
+    return `taskboard: filters:${userId}:${projectId} `;
   }, [projectId, userId]);
 
   const loadTaskCommentMeta = useCallback(async () => {
@@ -362,14 +491,14 @@ const TaskList = forwardRef(function TaskList(
     }
 
     const channel = supabase
-      .channel(`mentions-filter-${projectId}-${userId}`)
+      .channel(`mentions - filter - ${projectId} -${userId} `)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${userId}`
+          filter: `user_id = eq.${userId} `
         },
         (payload) => {
           const newNotif = payload.new;
@@ -873,6 +1002,79 @@ const TaskList = forwardRef(function TaskList(
     [userId, recalcSubtaskStats]
   );
 
+  const handleAutoPrioritize = useCallback(async () => {
+    const pendingTasks = tasks.filter(t => !t.completed);
+    if (!projectId || !userId || pendingTasks.length === 0) {
+      setErrorMessage('No hay tareas pendientes para organizar.');
+      return;
+    }
+
+    const confirmed = window.confirm('Esto pedirá a la IA que reorganice las prioridades de tus tareas pendientes. ¿Deseas continuar?');
+    if (!confirmed) return;
+
+    setAddingTask(true);
+    setErrorMessage('');
+
+    try {
+      const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
+      if (!API_KEY) throw new Error('Falta la API Key de Gemini en el archivo .env');
+
+      const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${API_KEY}`;
+
+      const tasksSummary = pendingTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        due_date: t.due_date,
+        effort: t.effort
+      }));
+
+      const prompt = `
+        Actúa como un experto gestor de proyectos. Analiza las siguientes tareas pendientes y asígnales una prioridad ("high", "medium" o "low") optimizada para maximizar la productividad, considerando sus títulos y fechas de entrega (si las tienen).
+        Tareas: ${JSON.stringify(tasksSummary)}
+
+        Devuelve ÚNICAMENTE un array JSON de objetos con este formato: [{"id": "uuid-de-la-tarea", "priority": "high|medium|low"}].
+        No añadas texto antes ni después del JSON.
+      `;
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || 'Error comunicando con Gemini AI');
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates[0].content.parts[0].text;
+      const cleanedText = rawText.replace(/```json|```/g, '').trim();
+      const newPriorities = JSON.parse(cleanedText);
+
+      if (!Array.isArray(newPriorities)) throw new Error('La IA devolvió un formato inválido.');
+
+      // Actualizar una por una para asegurar cumplimiento de RLS y triggers
+      const updates = newPriorities.map(item =>
+        supabase
+          .from('tasks')
+          .update({ priority: item.priority, updated_by: userId })
+          .eq('id', item.id)
+          .eq('project_id', projectId)
+      );
+
+      await Promise.all(updates);
+      await loadTasks();
+
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err.message || 'Error al intentar priorizar tareas con IA.');
+    } finally {
+      setAddingTask(false);
+    }
+  }, [projectId, userId, tasks, loadTasks]);
+
   const handleToggleSubtask = useCallback(
     async (taskId, subtask) => {
       if (!taskId || !subtask) {
@@ -1134,54 +1336,6 @@ const TaskList = forwardRef(function TaskList(
     });
   }, [filteredTasks, sectionsGrouping]);
 
-  const loadTasks = useCallback(async () => {
-    if (!userId || !projectId) {
-      setTasks([]);
-      return;
-    }
-
-    setLoading(true);
-    setErrorMessage('');
-
-    const baseQuery = () =>
-      supabase
-        .from('tasks')
-        .select(
-          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,updated_by,updated_at,priority,effort,tags,epic'
-        )
-        .eq('project_id', projectId)
-        .order('inserted_at', { ascending: false });
-
-    const fallbackQuery = () =>
-      supabase
-        .from('tasks')
-        .select('id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,due_date,priority')
-        .eq('project_id', projectId)
-        .order('inserted_at', { ascending: false });
-
-    try {
-      let { data, error } = await baseQuery();
-
-      if (error) {
-        if (error.code === '42703') {
-          const { data: fallbackData, error: fallbackError } = await fallbackQuery();
-          if (fallbackError) {
-            setErrorMessage(fallbackError.message);
-            return;
-          }
-          setTasks(fallbackData ?? []);
-          return;
-        }
-
-        setErrorMessage(error.message);
-        return;
-      }
-
-      setTasks(data ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, userId]);
 
   const addTask = useCallback(
     async (event) => {
@@ -1248,6 +1402,10 @@ const TaskList = forwardRef(function TaskList(
       const nextCompleted = !task.completed;
       const completionTimestamp = nextCompleted ? new Date().toISOString() : null;
 
+      if (nextCompleted) {
+        playSuccessSound();
+      }
+
       const { data, error } = await supabase
         .from('tasks')
         .update({ completed: nextCompleted, completed_at: completionTimestamp, updated_by: userId })
@@ -1269,6 +1427,54 @@ const TaskList = forwardRef(function TaskList(
       }
 
       setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+      if (nextCompleted) {
+        // Disparar confetti
+        if (task.priority === 'high') {
+          // Confetti más persistente para tareas de alta prioridad
+          const duration = 3 * 1000;
+          const animationEnd = Date.now() + duration;
+          const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+          const randomInRange = (min, max) => Math.random() * (max - min) + min;
+
+          const interval = setInterval(function () {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+              return clearInterval(interval);
+            }
+
+            const particleCount = 25 * (timeLeft / duration);
+            // since particles fall down, start a bit higher than random
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+              gravity: 0.8,
+              scalar: 0.8,
+              drift: randomInRange(-0.5, 0.5)
+            });
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+              gravity: 0.8,
+              scalar: 0.8,
+              drift: randomInRange(-0.5, 0.5)
+            });
+          }, 450);
+        } else {
+          // Confetti básico para otras - Ajustado para ser más suave
+          void confetti({
+            particleCount: 60,
+            spread: 60,
+            origin: { y: 0.7 },
+            gravity: 1.0,
+            scalar: 0.7,
+            ticks: 150
+          });
+        }
+      }
       setPendingTaskId(null);
     },
     [projectId, userId]
@@ -1316,6 +1522,10 @@ const TaskList = forwardRef(function TaskList(
 
       setErrorMessage('');
       const completionTimestamp = nextCompleted ? new Date().toISOString() : null;
+
+      if (nextCompleted) {
+        playSuccessSound();
+      }
 
       const { data, error } = await supabase
         .from('tasks')
@@ -1431,7 +1641,7 @@ const TaskList = forwardRef(function TaskList(
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
       setPendingTaskId(null);
     },
-    [projectId, userId]
+    [projectId]
   );
 
   const renderListView = useMemo(() => {
@@ -1500,15 +1710,20 @@ const TaskList = forwardRef(function TaskList(
               {selectedTaskIds.length === 1 ? '' : 's'} seleccionada
               {selectedTaskIds.length === 1 ? '' : 's'}
             </span>
-            <Button size="xs" color="success" onClick={() => void handleBulkUpdateCompletion(true)}>
-              Marcar como completadas
-            </Button>
-            <Button size="xs" color="warning" onClick={() => void handleBulkUpdateCompletion(false)}>
-              Marcar como pendientes
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="xs" color="success" onClick={() => void handleBulkUpdateCompletion(true)}>
+                Completar
+              </Button>
+              <Button size="xs" color="warning" onClick={() => void handleBulkUpdateCompletion(false)}>
+                Pendiente
+              </Button>
+              <Button size="xs" color="gray" onClick={() => setSelectedTaskIds([])}>
+                Limpiar
+              </Button>
+            </div>
             <Select
               sizing="sm"
-              className="w-40"
+              className="w-full sm:w-40"
               defaultValue=""
               onChange={(event) => {
                 const value = event.target.value;
@@ -1523,34 +1738,69 @@ const TaskList = forwardRef(function TaskList(
               <option value="medium">Media</option>
               <option value="low">Baja</option>
             </Select>
-            {members.length > 0 ? (
-              <Select
-                sizing="sm"
-                className="w-56"
-                defaultValue=""
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value) {
-                    void handleBulkUpdateAssignee(value);
-                    event.target.value = '';
-                  }
-                }}
-              >
-                <option value="">Cambiar responsable…</option>
-                <option value="__unassign__">Quitar responsable</option>
-                {members.map((member) => (
-                  <option key={member.member_id} value={member.member_id}>
-                    {member.member_email ?? member.member_id}
-                  </option>
-                ))}
-              </Select>
-            ) : null}
-            <Button size="xs" color="gray" onClick={() => setSelectedTaskIds([])}>
-              Limpiar selección
-            </Button>
           </div>
         ) : null}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/40 shadow-lg shadow-slate-200/40 dark:shadow-slate-950/40">
+
+        {/* Mobile List View */}
+        <div className="block sm:hidden space-y-3">
+          {sortedTasks.map((task) => {
+            const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
+            const assigneeLabel = assigneeMember?.member_email ?? (task.assigned_to ? 'Asignado' : 'Sin asignar');
+            const dueDate = task.due_date ? new Date(task.due_date) : null;
+            const dueLabel = dueDate ? new Intl.DateTimeFormat('es-ES', { month: 'short', day: 'numeric' }).format(dueDate) : null;
+            const isOverdue = Boolean(dueDate && !task.completed && dueDate.getTime() < now);
+
+            return (
+              <div
+                key={task.id}
+                onClick={() => {
+                  setSelectedTaskDetail(task);
+                  setViewMode('detail');
+                  setActiveTasksSection('tasks');
+                }}
+                className={`flex flex-col gap-2 rounded-xl border bg-white p-3 shadow-sm dark:bg-slate-950/40 cursor-pointer ${task.completed ? 'border-slate-200 dark:border-slate-800 opacity-75' :
+                  task.priority === 'high' ? 'border-rose-200 dark:border-rose-900/50' : 'border-slate-200 dark:border-slate-800'
+                  }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className={`text-sm font-semibold line-clamp-2 ${task.completed ? 'text-slate-500 line-through' : 'text-slate-900 dark:text-slate-100'}`}>
+                    {task.title}
+                  </p>
+                  <Checkbox
+                    className="shrink-0"
+                    checked={selectedTaskIds.includes(task.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setSelectedTaskIds((previous) => {
+                        if (checked) {
+                          if (previous.includes(task.id)) return previous;
+                          return [...previous, task.id];
+                        }
+                        return previous.filter((id) => id !== task.id);
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <Badge color={task.priority === 'high' ? 'failure' : task.priority === 'low' ? 'success' : 'warning'} size="xs">
+                    {task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baja' : 'Media'}
+                  </Badge>
+                  {dueLabel && (
+                    <span className={isOverdue ? 'text-rose-600 font-medium' : ''}>
+                      {isOverdue ? '!' : ''} {dueLabel}
+                    </span>
+                  )}
+                  <span className="truncate max-w-[100px]">{assigneeLabel}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/40 shadow-lg shadow-slate-200/40 dark:shadow-slate-950/40">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm text-slate-100">
               <thead className="bg-slate-50 dark:bg-slate-950/70 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
@@ -1732,11 +1982,9 @@ const TaskList = forwardRef(function TaskList(
     filteredTasks,
     isEmpty,
     isFilteredEmpty,
-    handleBulkUpdateAssignee,
     handleBulkUpdateCompletion,
     handleBulkUpdatePriority,
     loading,
-    members,
     membersById,
     projectId,
     selectedTaskDetail?.id,
@@ -2023,11 +2271,11 @@ const TaskList = forwardRef(function TaskList(
       const isOverdue = Boolean(dueDate && !task.completed && dueDate.getTime() < now);
       const isDueSoon = Boolean(dueDate && !task.completed && !isOverdue && dueDate.getTime() - now <= 1000 * 60 * 60 * 24);
       const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
-      const assigneeLabel = assigneeMember?.member_email ?? task.assigned_to ?? 'Sin asignar';
+      const assigneeLabel = assigneeMember?.member_email ?? (task.assigned_to ? 'Colaborador' : 'Sin asignar');
       const creatorMember = task.created_by ? membersById[task.created_by] : null;
-      const creatorLabel = creatorMember?.member_email ?? task.owner_email ?? task.created_by ?? 'Desconocido';
+      const creatorLabel = creatorMember?.member_email ?? task.owner_email ?? 'Dueño del Proyecto';
       const updaterMember = task.updated_by ? membersById[task.updated_by] : null;
-      const updaterLabel = updaterMember?.member_email ?? task.updated_by ?? 'Sin registro';
+      const updaterLabel = updaterMember?.member_email ?? (task.updated_by ? 'Colaborador' : 'Sin registro');
       const lastCommentAt = taskCommentMeta[task.id] ? new Date(taskCommentMeta[task.id]) : null;
       const activityMeta = taskActivityMeta[task.id] ?? null;
       const lastActivityLabel = activityMeta?.createdAt ? formatRelativeTime(new Date(activityMeta.createdAt)) : null;
@@ -2495,23 +2743,24 @@ const TaskList = forwardRef(function TaskList(
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-3 text-[11px] text-slate-400">
+          <div className="hidden sm:grid sm:grid-cols-7 gap-3 text-[11px] text-slate-400">
             {weekdayHeaders.map((label) => (
-              <div key={label} className="text-center font-semibold uppercase tracking-wide">
+              <div key={label} className="text-center font-bold uppercase tracking-widest text-slate-500">
                 {label}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-7">
             {cells.map((date, index) => {
               if (!date) {
-                return <div key={`empty-${index}`} className="h-24 rounded-2xl border border-transparent" />;
+                return <div key={`empty-${index}`} className="hidden sm:block h-24 rounded-2xl border border-transparent" />;
               }
 
               const key = formatKey(date);
               const dayTasks = tasksByDay[key] ?? [];
               const isToday = key === todayKey;
+              const weekdayName = new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(date);
 
               return (
                 <Card
@@ -2521,6 +2770,7 @@ const TaskList = forwardRef(function TaskList(
                 >
                   <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
                     <span className={isToday ? 'font-semibold text-cyan-600 dark:text-cyan-200' : 'font-semibold text-slate-900 dark:text-slate-200'}>
+                      <span className="capitalize sm:hidden mr-1">{weekdayName}</span>
                       {date.getDate()}
                     </span>
                     <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
@@ -2534,14 +2784,20 @@ const TaskList = forwardRef(function TaskList(
                         const assigneeLabel = assigneeMember?.member_email ?? task.assigned_to ?? 'Sin asignar';
                         const isAuthUserAssignee = task.assigned_to === userId;
 
+                        const priorityColorClass = task.priority === 'high'
+                          ? 'border-rose-500/50 bg-rose-100 dark:bg-rose-900/30 text-rose-900 dark:text-rose-100'
+                          : task.priority === 'medium'
+                            ? 'border-amber-500/50 bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100'
+                            : 'border-emerald-500/50 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100';
+
                         return (
                           <button
                             key={task.id}
                             type="button"
                             className={`w-full rounded-lg border px-1 py-0.5 text-left text-[11px] transition-colors ${isAuthUserAssignee
-                              ? 'border-cyan-500/40 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-100 hover:bg-cyan-200 dark:hover:bg-cyan-900/50'
-                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/40'
-                              }`}
+                              ? 'ring-1 ring-cyan-500/50'
+                              : ''
+                              } ${priorityColorClass} hover:opacity-80`}
                             onClick={() => {
                               setSelectedTaskDetail(task);
                               setViewMode('detail');
@@ -2562,6 +2818,21 @@ const TaskList = forwardRef(function TaskList(
                 </Card>
               );
             })}
+          </div>
+
+          <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-800/50">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <div className="h-2 w-2 rounded-full bg-rose-500"></div>
+              <span>Alta</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+              <span>Media</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+              <span>Baja</span>
+            </div>
           </div>
         </div>
       );
@@ -2626,10 +2897,49 @@ const TaskList = forwardRef(function TaskList(
     <div className="space-y-6">
       <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-slate-400">Proyecto activo</p>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{project?.name ?? 'Sin proyecto seleccionado'}</h2>
-            <p className="text-xs text-slate-500">Propietario: {projectOwnerLabel}</p>
+          <div className="flex flex-1 items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-400">Proyecto activo</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{project?.name ?? 'Sin proyecto seleccionado'}</h2>
+              <p className="text-xs text-slate-500">Propietario: {projectOwnerLabel}</p>
+            </div>
+
+            {/* Burbujas de Presencia */}
+            {projectViewers.length > 0 && (
+              <div className="flex flex-col items-end gap-1 px-4">
+                <div className="flex -space-x-2">
+                  {projectViewers.slice(0, 5).map((viewer, idx) => {
+                    const member = membersById[viewer.userId];
+                    const initials = member?.member_email?.[0].toUpperCase() || '?';
+                    return (
+                      <div
+                        key={viewer.userId}
+                        title={member?.member_email || 'Cargando...'}
+                        className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-slate-100 dark:border-slate-900 dark:bg-slate-800"
+                        style={{ zIndex: 10 - idx }}
+                      >
+                        {member?.avatar_url ? (
+                          <img src={member.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                            {initials}
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-slate-900" />
+                      </div>
+                    );
+                  })}
+                  {projectViewers.length > 5 && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-[10px] font-bold text-slate-600 dark:border-slate-900 dark:bg-slate-700 dark:text-slate-300">
+                      +{projectViewers.length - 5}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  {projectViewers.length} {projectViewers.length === 1 ? 'activo' : 'activos'}
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
             <div className="flex flex-col items-center text-center">
@@ -2652,9 +2962,23 @@ const TaskList = forwardRef(function TaskList(
               <p className="text-slate-500">Altas hoy</p>
               <p className="text-base font-semibold text-amber-600 dark:text-amber-200">{highPriorityStats.dueToday}</p>
             </div>
+            {productivityStreak > 0 && (
+              <div className="flex flex-col items-center text-center px-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                <p className="text-[10px] uppercase font-bold text-orange-600 dark:text-orange-400">Racha 🔥</p>
+                <p className="text-base font-black text-orange-600 dark:text-orange-400">
+                  {productivityStreak} {productivityStreak === 1 ? 'Día' : 'Días'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </Card>
+
+      {showDailyFlash && projectId && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+          <DailyFlash projectId={projectId} onClose={() => setShowDailyFlash(false)} />
+        </div>
+      )}
 
       <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
         <div className="space-y-4">
@@ -2693,7 +3017,7 @@ const TaskList = forwardRef(function TaskList(
             })}
           </div>
 
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 min-h-[300px]">
+          <div className="min-h-[300px]">
             {activeTasksSection === 'tasks' && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -2711,8 +3035,30 @@ const TaskList = forwardRef(function TaskList(
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                       )
+                    },
+                    {
+                      id: 'ai-prioritize', label: 'Priorizar con IA', icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                        </svg>
+                      ),
+                      onClick: handleAutoPrioritize
                     }
                   ].map((tool) => {
+                    if (tool.id === 'ai-prioritize') {
+                      return (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          disabled={addingTask}
+                          onClick={tool.onClick}
+                          className="flex items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/5 px-3 py-2 text-xs font-medium text-purple-600 transition-all hover:bg-purple-500/10 dark:text-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        >
+                          {tool.icon}
+                          <span>{tool.label}</span>
+                        </button>
+                      );
+                    }
                     const isActive = taskToolsTab === tool.id;
                     return (
                       <button
@@ -2731,7 +3077,7 @@ const TaskList = forwardRef(function TaskList(
                   })}
                 </div>
 
-                <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+                <div>
                   {taskToolsTab === 'search' && (
                     <div className="space-y-4">
 
@@ -2747,29 +3093,31 @@ const TaskList = forwardRef(function TaskList(
                       </div>
 
                       {showFilters ? (
-                        <TaskFiltersPanel
-                          projectId={projectId}
-                          searchQuery={searchQuery}
-                          onSearchQueryChange={setSearchQuery}
-                          quickFilters={quickFilters}
-                          statusFilter={statusFilter}
-                          setStatusFilter={setStatusFilter}
-                          assigneeFilter={assigneeFilter}
-                          setAssigneeFilter={setAssigneeFilter}
-                          priorityFilter={priorityFilter}
-                          setPriorityFilter={setPriorityFilter}
-                          effortFilter={effortFilter}
-                          setEffortFilter={setEffortFilter}
-                          tagFilter={tagFilter}
-                          setTagFilter={setTagFilter}
-                          sortMode={sortMode}
-                          setSortMode={setSortMode}
-                          onlyMentionedFilter={onlyMentionedFilter}
-                          setOnlyMentionedFilter={setOnlyMentionedFilter}
-                          hasMentionedTasks={mentionedTaskIds.size > 0}
-                          members={members}
-                          availableTags={availableTags}
-                        />
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                          <TaskFiltersPanel
+                            projectId={projectId}
+                            searchQuery={searchQuery}
+                            onSearchQueryChange={setSearchQuery}
+                            quickFilters={quickFilters}
+                            statusFilter={statusFilter}
+                            setStatusFilter={setStatusFilter}
+                            assigneeFilter={assigneeFilter}
+                            setAssigneeFilter={setAssigneeFilter}
+                            priorityFilter={priorityFilter}
+                            setPriorityFilter={setPriorityFilter}
+                            effortFilter={effortFilter}
+                            setEffortFilter={setEffortFilter}
+                            tagFilter={tagFilter}
+                            setTagFilter={setTagFilter}
+                            sortMode={sortMode}
+                            setSortMode={setSortMode}
+                            onlyMentionedFilter={onlyMentionedFilter}
+                            setOnlyMentionedFilter={setOnlyMentionedFilter}
+                            hasMentionedTasks={mentionedTaskIds.size > 0}
+                            members={members}
+                            availableTags={availableTags}
+                          />
+                        </div>
                       ) : null}
                     </div>
                   )}
@@ -2864,14 +3212,14 @@ const TaskList = forwardRef(function TaskList(
                     })}
                   </nav>
 
-                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div>
                     {viewMode === 'list' && <div className="mt-4">{listContent}</div>}
                     {viewMode === 'kanban' && <div className="mt-4">{kanbanContent}</div>}
                     {viewMode === 'timeline' && <div className="mt-4">{timelineContent}</div>}
                     {viewMode === 'calendar' && <div className="mt-4">{calendarContent}</div>}
                     {viewMode === 'sections' && <div className="mt-4">{sectionsContent}</div>}
                     {viewMode === 'detail' && selectedTaskDetail && (
-                      <div className="mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4">
+                      <div className="mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4 overflow-hidden min-w-0">
                         <TaskDetailPanel
                           task={selectedTaskDetail}
                           membersById={membersById}
@@ -2879,6 +3227,9 @@ const TaskList = forwardRef(function TaskList(
                           workspaceId={workspaceId}
                           projectId={projectId}
                           currentUserId={userId}
+                          isOwner={project?.user_id === userId}
+                          ownerLabel={projectOwnerLabel}
+                          projectName={project?.name}
                           onClose={() => {
                             setSelectedTaskDetail(null);
                             setViewMode('list');

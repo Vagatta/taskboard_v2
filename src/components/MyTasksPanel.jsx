@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Card, Select, Spinner } from 'flowbite-react';
+import { Alert, Badge, Card, Select } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
+import Skeleton from './ui/Skeleton';
 import { formatRelativeTime } from '../utils/dateHelpers';
 
 // Panel sencillo para ver todas las tareas asignadas al usuario en todos los proyectos.
@@ -171,9 +172,19 @@ export default function MyTasksPanel({ user }) {
           {error ? (
             <Alert color="failure">{error}</Alert>
           ) : loading ? (
-            <div className="flex items-center justify-center py-10 text-slate-600 dark:text-slate-400">
-              <Spinner size="lg" />
-              <span className="ml-3 text-sm">Cargando tus tareas…</span>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-slate-950/10">
+              <div className="space-y-4 p-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="grid grid-cols-6 gap-4 border-b border-slate-200 dark:border-slate-800/40 pb-4 last:border-0 last:pb-0">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-1/4" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-1/4" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : filteredTasks.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/10 p-6 text-sm text-slate-600 dark:text-slate-400">

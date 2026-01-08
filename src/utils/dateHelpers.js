@@ -57,3 +57,42 @@ export function humanizeEventType(eventType) {
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+export function calculateStreak(completedDates) {
+  if (!Array.isArray(completedDates) || completedDates.length === 0) return 0;
+
+  // Normalizar fechas a YYYY-MM-DD y descartar duplicados
+  const uniqueDates = [...new Set(
+    completedDates
+      .map(d => new Date(d))
+      .filter(d => !isNaN(d.getTime()))
+      .map(d => d.toISOString().split('T')[0])
+  )].sort().reverse();
+
+  if (uniqueDates.length === 0) return 0;
+
+  let streak = 0;
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  // Si la última actividad fue hace más de un día, la racha es 0
+  if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
+    return 0;
+  }
+
+  let checkDate = new Date(uniqueDates[0]);
+  for (let i = 0; i < uniqueDates.length; i++) {
+    const expectedStr = checkDate.toISOString().split('T')[0];
+    if (uniqueDates[i] === expectedStr) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}

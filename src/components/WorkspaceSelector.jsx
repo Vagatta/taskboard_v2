@@ -97,10 +97,6 @@ export default function WorkspaceSelector({
     }, 5000);
   };
 
-  useEffect(() => {
-    loadMyPendingInvitations();
-  }, [loadMyPendingInvitations]);
-
   // Cargar invitaciones donde el usuario actual es el destinatario (email coincide)
   const loadMyPendingInvitations = useCallback(async () => {
     console.log('Cargando invitaciones para:', user?.email);
@@ -122,6 +118,10 @@ export default function WorkspaceSelector({
       console.error('Error cargando mis invitaciones:', err);
     }
   }, [user?.email]);
+
+  useEffect(() => {
+    loadMyPendingInvitations();
+  }, [loadMyPendingInvitations]);
 
   const handleAcceptMyself = async (token) => {
     try {
@@ -358,12 +358,12 @@ export default function WorkspaceSelector({
   return (
     <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-none">
       <div className="flex flex-col gap-4">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Espacios de trabajo</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Organiza proyectos por workspace e invita a tu equipo.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Organiza proyectos e invita a tu equipo.</p>
           </div>
-          <Button color="dark" onClick={() => queryClient.invalidateQueries(['workspaces'])} disabled={loadingWorkspaces}>
+          <Button color="dark" onClick={() => queryClient.invalidateQueries(['workspaces'])} disabled={loadingWorkspaces} className="w-full sm:w-auto">
             {loadingWorkspaces ? 'Actualizando...' : 'Actualizar'}
           </Button>
         </header>
@@ -376,23 +376,23 @@ export default function WorkspaceSelector({
 
         {/* SECCIÓN DE INVITACIONES RECIBIDAS */}
         {myInvitations.length > 0 && (
-          <div className="mb-4 space-y-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-800 dark:bg-cyan-900/20">
+          <div className="mb-2 space-y-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-800 dark:bg-cyan-900/20">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-cyan-800 dark:text-cyan-200">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-200 text-xs text-cyan-900">!</span>
               Invitaciones para ti ({myInvitations.length})
             </h3>
             <div className="space-y-2">
               {myInvitations.map((inv) => (
-                <div key={inv.id} className="flex flex-col gap-2 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                <div key={inv.id} className="flex flex-col gap-3 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white break-all">
                       Te han invitado al workspace: <strong>{inv.workspace_name}</strong>
                     </p>
                     <p className="text-xs text-slate-500">
                       Rol: {inv.role} • Expira: {new Date(inv.expires_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <Button size="xs" color="success" onClick={() => handleAcceptMyself(inv.token)}>
+                  <Button size="xs" color="success" className="w-full sm:w-auto" onClick={() => handleAcceptMyself(inv.token)}>
                     Aceptar y Unirme
                   </Button>
                 </div>
@@ -403,23 +403,23 @@ export default function WorkspaceSelector({
 
         {/* SECCIÓN DE INVITACIONES A PROYECTOS RECIBIDAS */}
         {myProjectInvitations.length > 0 && (
-          <div className="mb-4 space-y-3 rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20">
+          <div className="mb-2 space-y-3 rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-200 text-xs text-purple-900">!</span>
               Invitaciones a Proyectos ({myProjectInvitations.length})
             </h3>
             <div className="space-y-2">
               {myProjectInvitations.map((inv) => (
-                <div key={inv.id} className="flex flex-col gap-2 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                <div key={inv.id} className="flex flex-col gap-3 rounded-lg bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white break-all">
                       Te han invitado al proyecto: <strong>{inv.project_name}</strong>
                     </p>
                     <p className="text-xs text-slate-500">
                       Workspace: {inv.workspace_name} • Rol: {inv.role}
                     </p>
                   </div>
-                  <Button size="xs" color="purple" onClick={() => handleAcceptProjectMyself(inv.token)}>
+                  <Button size="xs" color="purple" className="w-full sm:w-auto" onClick={() => handleAcceptProjectMyself(inv.token)}>
                     Aceptar y Unirme
                   </Button>
                 </div>
@@ -428,56 +428,59 @@ export default function WorkspaceSelector({
           </div>
         )}
 
-        <div className="border border-slate-200 dark:border-slate-800 rounded-xl bg-white/50 dark:bg-slate-950/30 p-2">
-          <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
-            {[
-              {
-                id: 'workspaces', label: 'Workspaces', icon: (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
-                  </svg>
-                )
-              },
-              {
-                id: 'create', label: 'Crear workspace', icon: (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                )
-              },
-              {
-                id: 'invite', label: 'Invitar miembros', disabled: !selectedWorkspaceId, icon: (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3.75 15a2.25 2.25 0 0 1 2.25-2.25h6a2.25 2.25 0 0 1 2.25 2.25v1.5H3.75v-1.5Z" />
-                  </svg>
-                )
-              }
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              const isDisabled = tab.disabled;
-              if (isDisabled && !isActive) return null;
+        <div className="border border-slate-200 dark:border-slate-800 rounded-xl bg-white/50 dark:bg-slate-950/30 p-2 overflow-hidden">
+          <div className="relative border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+            <nav className="flex items-center gap-2 overflow-x-auto pr-8 scrollbar-hide no-scrollbar">
+              {[
+                {
+                  id: 'workspaces', label: 'Workspaces', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'create', label: 'Crear', icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  )
+                },
+                {
+                  id: 'invite', label: 'Invitar', disabled: !selectedWorkspaceId, icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3.75 15a2.25 2.25 0 0 1 2.25-2.25h6a2.25 2.25 0 0 1 2.25 2.25v1.5H3.75v-1.5Z" />
+                    </svg>
+                  )
+                }
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                const isDisabled = tab.disabled;
+                if (isDisabled && !isActive) return null;
 
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => !isDisabled && setActiveTab(tab.id)}
-                  disabled={isDisabled}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${isActive
-                    ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                    : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                    } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => !isDisabled && setActiveTab(tab.id)}
+                    disabled={isDisabled}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors flex-shrink-0 ${isActive
+                      ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                      : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                      } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white dark:from-slate-900 pointer-events-none block sm:hidden" />
+          </div>
 
           <div className="animate-in fade-in slide-in-from-left-1 duration-300">
             {activeTab === 'workspaces' && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
                 {workspacesError && (
                   <Alert color="failure">{workspacesError.message}</Alert>
                 )}
@@ -493,32 +496,40 @@ export default function WorkspaceSelector({
                   </div>
                 ) : (
                   <>
-                    <Select value={selectedWorkspaceId ?? ''} onChange={(event) => onSelect?.(event.target.value)}>
-                      {workspaces?.map((workspace) => (
-                        <option key={workspace.id} value={workspace.id}>
-                          {workspace.name} ({workspace.membershipRole})
-                        </option>
-                      ))}
-                    </Select>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Seleccionar Workspace</label>
+                      <Select value={selectedWorkspaceId ?? ''} onChange={(event) => onSelect?.(event.target.value)}>
+                        {workspaces?.map((workspace) => (
+                          <option key={workspace.id} value={workspace.id}>
+                            {workspace.name} ({workspace.membershipRole})
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
                     {activeWorkspace ? (
-                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/50 shadow-none p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">{activeWorkspace.name}</p>
-                            <p className="text-xs text-slate-500">Owner: {activeWorkspace.owner_id}</p>
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/50 shadow-none p-4 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{activeWorkspace.name}</p>
+                            <p className="truncate text-xs text-slate-500 mt-1">
+                              <span className="font-medium text-slate-400">Owner: </span>
+                              <span className="break-all">{activeWorkspaceMembers.find(m => m.member_id === activeWorkspace.owner_id)?.member_email ?? (activeWorkspace.owner_id === user?.id ? user?.email : activeWorkspace.owner_id)}</span>
+                            </p>
                           </div>
-                          <Badge color="info">{activeWorkspaceMembers.length} miembros</Badge>
+                          <Badge color="info" size="sm" className="w-fit self-start sm:self-auto flex-shrink-0">{activeWorkspaceMembers.length} miembros</Badge>
                         </div>
                         {loadingMembers ? (
-                          <div className="mt-3 flex gap-2">
-                            <Skeleton className="h-5 w-20 rounded-full" />
-                            <Skeleton className="h-5 w-20 rounded-full" />
+                          <div className="mt-4 flex gap-2">
+                            <Skeleton className="h-6 w-24 rounded-full" />
+                            <Skeleton className="h-6 w-24 rounded-full" />
                           </div>
                         ) : activeWorkspaceMembers.length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-4 flex flex-wrap gap-2">
                             {activeWorkspaceMembers.map((member) => (
                               <Badge
                                 key={member.member_id}
+                                size="xs"
                                 color={
                                   member.role === 'owner'
                                     ? 'purple'
@@ -526,16 +537,17 @@ export default function WorkspaceSelector({
                                       ? 'info'
                                       : 'gray'
                                 }
+                                className="max-w-full"
                               >
-                                <span className="text-xs">
+                                <span className="inline-block max-w-[140px] truncate align-bottom">
                                   {member.member_email}
-                                  <span className="ml-1 uppercase">({member.role})</span>
                                 </span>
+                                <span className="ml-1 uppercase opacity-70 text-[9px]">({member.role})</span>
                               </Badge>
                             ))}
                           </div>
                         ) : (
-                          <p className="mt-3 text-xs text-slate-500">No hay miembros registrados en este workspace.</p>
+                          <p className="mt-4 text-xs text-slate-500 italic">No hay miembros registrados.</p>
                         )}
                       </div>
                     ) : null}

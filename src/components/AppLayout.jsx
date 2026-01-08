@@ -1,4 +1,3 @@
-import { Badge } from 'flowbite-react';
 
 export default function AppLayout({
   heading,
@@ -25,19 +24,19 @@ export default function AppLayout({
     <div className="space-y-8">
       <header className="flex flex-col gap-4">
         {breadcrumbs.length > 0 ? (
-          <nav aria-label="Ruta" className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500">
-            <ol className="flex flex-wrap items-center gap-2">
+          <nav aria-label="Ruta" className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500 overflow-x-auto no-scrollbar whitespace-nowrap mask-linear-fade">
+            <ol className="flex items-center gap-2">
               {breadcrumbs.map((crumb, index) => (
                 <li key={`${crumb.label}-${index}`} className="flex items-center gap-2 text-slate-500 dark:text-slate-500">
                   {crumb.href ? (
-                    <a href={crumb.href} className="transition hover:text-slate-900 dark:hover:text-slate-200">
+                    <a href={crumb.href} className="max-w-[100px] sm:max-w-none truncate transition hover:text-slate-900 dark:hover:text-slate-200">
                       {crumb.label}
                     </a>
                   ) : crumb.onClick ? (
                     <button
                       type="button"
                       onClick={crumb.onClick}
-                      className="transition hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none"
+                      className="max-w-[100px] sm:max-w-none truncate transition hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none"
                     >
                       {crumb.label}
                     </button>
@@ -61,27 +60,38 @@ export default function AppLayout({
               </p>
             )}
           </div>
-          {actions ? <div className="flex-shrink-0">{actions}</div> : null}
+          {/* Actions: Desktop custom actions + Mobile sidebar actions integration */}
+          <div className="flex shrink-0 items-center gap-2">
+            {actions ? <div>{actions}</div> : null}
+            {/* Show sidebar actions on mobile header if they exist */}
+            {sidebarActions ? (
+              <div className="lg:hidden">
+                {sidebarActions}
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
-      {statusItems.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {statusItems.map((item) => (
-            <div
-              key={item.label}
-              onClick={item.onClick}
-              className={`rounded-2xl border p-4 ${panelBorderClass} ${item.onClick ? 'cursor-pointer transition-transform hover:scale-[1.02] hover:shadow-md active:scale-[0.98]' : ''
-                }`}
-            >
-              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{item.value}</p>
-              {item.helper ? <p className="text-xs text-slate-500 dark:text-slate-500">{item.helper}</p> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <div className="space-y-6">{children}</div>
-    </div>
+      {
+        statusItems.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {statusItems.map((item) => (
+              <div
+                key={item.label}
+                onClick={item.onClick}
+                className={`min-w-0 rounded-2xl border p-4 ${panelBorderClass} ${item.onClick ? 'cursor-pointer transition-transform hover:scale-[1.02] hover:shadow-md active:scale-[0.98]' : ''
+                  }`}
+              >
+                <p className="truncate text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400" title={item.label}>{item.label}</p>
+                <p className="mt-1 truncate text-lg font-semibold text-slate-900 dark:text-white" title={item.value}>{item.value}</p>
+                {item.helper ? <p className="truncate text-xs text-slate-500 dark:text-slate-500" title={item.helper}>{item.helper}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : null
+      }
+      < div className="space-y-6" > {children}</div >
+    </div >
   );
 
   const renderNavItems = (variant = 'full') => (
@@ -131,20 +141,32 @@ export default function AppLayout({
             {sidebarFooter ? <div className="mt-6 border-t border-slate-200 dark:border-slate-800/60 pt-6">{sidebarFooter}</div> : null}
           </div>
         </aside>
-        <main className="no-scrollbar flex-1 flex flex-col overflow-hidden px-4 lg:px-10 lg:max-w-7xl lg:mx-auto">
-          {navigationItems.length > 0 ? (
-            <div className={`mb-4 rounded-3xl p-4 lg:hidden ${panelBorderClass}`}>
-              {sidebarActions ? <div className="mb-4">{sidebarActions}</div> : null}
-              {renderNavItems('compact')}
-              {sidebarFooter ? <div className="mt-4">{sidebarFooter}</div> : null}
-            </div>
-          ) : null}
+        <main className="no-scrollbar flex-1 flex flex-col overflow-hidden px-4 pb-20 lg:pb-0 lg:px-10 lg:max-w-7xl lg:mx-auto">
+          {/* Mobile Header Acts as Top Bar */}
+          {/* Mobile Header Acts as Top Bar - Removed redundant nav items */}
+
           <div
-            className={`custom-scrollbar mx-auto w-full h-full overflow-y-auto rounded-[32px] border p-6 backdrop-blur ${contentCardClass}`}
+            className={`custom-scrollbar mx-auto w-full h-full overflow-y-auto rounded-3xl sm:rounded-[32px] border p-4 sm:p-6 backdrop-blur ${contentCardClass}`}
           >
             {headerSection}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/90 p-3 pb-safe backdrop-blur-lg dark:border-slate-800 dark:bg-slate-950/90 lg:hidden safe-area-bottom">
+          {navigationItems.slice(0, 4).map((item) => (
+            <button
+              key={item.id}
+              onClick={item.onClick}
+              className={`flex flex-col items-center gap-1 p-2 transition-colors ${item.active ? 'text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-400'
+                }`}
+            >
+              <span className={`text-2xl ${item.active ? 'scale-110' : ''}`}>{item.icon}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          ))}
+          {/* Fallback for profile or "More" if needed */}
+        </nav>
       </div>
     </div>
   );

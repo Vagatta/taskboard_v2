@@ -223,4 +223,4 @@ Este proyecto es de código privado. Todos los derechos reservados.
 
 ---
 
-Si este proyecto te resulta útil, considera darle una estrella
+⭐ Si este proyecto te resulta útil, considera darle una estrella en GitHub!

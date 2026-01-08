@@ -121,3 +121,66 @@ export function useProjectMembers(projectId) {
         staleTime: 1000 * 60 * 2,
     });
 }
+
+// --- GLOBAL STATS ---
+
+export function useUserGlobalStats(user) {
+    return useQuery({
+        queryKey: ['globalStats', user?.id],
+        queryFn: async () => {
+            if (!user?.id) return { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 };
+
+            // 1. Conteo de workspaces
+            const { count: wsCount } = await supabase
+                .from('workspace_members')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+
+            // 2. Conteo de proyectos
+            const { count: prjCount } = await supabase
+                .from('project_members')
+                .select('*', { count: 'exact', head: true })
+                .eq('member_id', user.id);
+
+            // 3. Tareas asignadas
+            const { count: taskCount } = await supabase
+                .from('tasks')
+                .select('*', { count: 'exact', head: true })
+                .eq('assigned_to', user.id);
+
+            // 4. Tareas completadas
+            const { count: completedCount } = await supabase
+                .from('tasks')
+                .select('*', { count: 'exact', head: true })
+                .eq('assigned_to', user.id)
+                .eq('completed', true);
+
+            // 5. Colaboradores únicos
+            let collaboratorsCount = 0;
+            const { data: myProjects } = await supabase
+                .from('project_members')
+                .select('project_id')
+                .eq('member_id', user.id);
+
+            const projectIds = myProjects?.map(p => p.project_id) ?? [];
+            if (projectIds.length > 0) {
+                const { data: collabData } = await supabase
+                    .from('project_members')
+                    .select('member_id')
+                    .in('project_id', projectIds);
+                const uniqueIds = new Set(collabData?.map(c => c.member_id));
+                collaboratorsCount = Math.max(0, uniqueIds.size - 1); // Restamos al usuario mismo
+            }
+
+            return {
+                workspaces: wsCount ?? 0,
+                projects: prjCount ?? 0,
+                tasks: taskCount ?? 0,
+                completed: completedCount ?? 0,
+                collaborators: collaboratorsCount
+            };
+        },
+        enabled: !!user?.id,
+        staleTime: 1000 * 60 * 5, // 5 minutos
+    });
+}

@@ -14,10 +14,21 @@ const getRequiredEnvVar = (name) => {
   return value;
 };
 
+const isBrowser = typeof window !== 'undefined';
+
 const supabaseUrl = getRequiredEnvVar('REACT_APP_SUPABASE_URL');
 const supabaseAnonKey = getRequiredEnvVar('REACT_APP_SUPABASE_ANON_KEY');
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// El cliente de Supabase ahora usa el almacenamiento por defecto (localStorage)
+// para evitar las limitaciones de tamaño de las cookies (4KB) que causaban problemas con Google OAuth.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storageKey: 'taskboard-v2-auth-token'
+  }
+});
 
 if (typeof window !== 'undefined') {
   window.supabase = supabase;

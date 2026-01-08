@@ -120,11 +120,11 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
               const latest = items[0];
               const payload = latest.payload ?? {};
               const taskTitle = payload.task_title ?? payload.task_id ?? 'Tarea';
-              const mentionedBy = membersById[payload.mentioned_by]?.member_email ?? payload.mentioned_by;
+              const mentionedBy = membersById[payload.mentioned_by]?.member_email ?? (payload.mentioned_by ? 'Un colaborador' : 'Alguien');
               return (
                 <div key={userId} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold text-slate-100">{member?.member_email ?? userId}</span>
+                    <span className="font-semibold text-slate-100">{member?.member_email ?? 'Colaborador'}</span>
                     <Badge color="info" size="xs">
                       {items.length} menc.
                     </Badge>

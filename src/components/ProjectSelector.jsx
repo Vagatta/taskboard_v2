@@ -25,7 +25,7 @@ export default function ProjectSelector({
 
 
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
   // const [membersByProject, setMembersByProject] = useState({}); // Replaced by hook
 
@@ -619,7 +619,7 @@ export default function ProjectSelector({
                     projects.map((project) => {
                       const isActive = project.id === selectedProjectId;
                       const ownerLabel =
-                        project.owner_email || (user?.id === project.user_id ? user?.email : project.user_id);
+                        project.owner_email || (user?.id === project.user_id ? user?.email : 'Dueño del Proyecto');
                       const createdAt = project.inserted_at ? new Date(project.inserted_at) : null;
                       const isNotifiable = notifiableProjects.includes(project.id);
 
@@ -751,8 +751,7 @@ export default function ProjectSelector({
                                 className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
                               >
                                 <div className="space-y-1">
-                                  <p className="text-sm font-medium text-slate-900 dark:text-white">{member.member_email ?? member.member_id}</p>
-                                  <p className="text-xs text-slate-500">ID: {member.member_id}</p>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">{member.member_email ?? 'Colaborador'}</p>
                                 </div>
                                 <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                                   <Select

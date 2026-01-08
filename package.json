@@ -1,7 +1,7 @@
 {
   "name": "taskboard",
   "version": "0.1.0",
-  "homepage": "/Taskboard",
+  "homepage": "/Taskboard/",
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.81.0",
@@ -10,8 +10,11 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "canvas-confetti": "^1.9.4",
     "flowbite": "^3.1.2",
     "flowbite-react": "^0.12.10",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "nodemailer": "^7.0.11",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

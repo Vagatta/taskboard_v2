@@ -11,7 +11,8 @@ export default function TasksManagementPanel({
   taskListRef,
   onViewModeChange,
   onTaskSummaryChange,
-  assigneePreset = null
+  assigneePreset = null,
+  initialTaskId = null
 }) {
   return (
     <div className="space-y-6">
@@ -38,6 +39,7 @@ export default function TasksManagementPanel({
           project={selectedProject}
           members={selectedProjectMembers}
           assigneePreset={assigneePreset}
+          initialTaskId={initialTaskId}
           onViewModeChange={onViewModeChange}
           onTaskSummaryChange={onTaskSummaryChange}
         />

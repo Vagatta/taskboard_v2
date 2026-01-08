@@ -13,6 +13,11 @@ const NOTIFICATION_META = {
     color: 'info',
     message: (payload) => `Te asignaron "${payload?.task_title ?? 'una tarea'}"`
   },
+  task_assignment: {
+    label: 'Nueva asignación',
+    color: 'info',
+    message: (payload) => `Te asignaron "${payload?.task_title ?? 'una tarea'}"`
+  },
   task_unassigned: {
     label: 'Asignación removida',
     color: 'warning',
@@ -266,9 +271,22 @@ export default function NotificationPanel({ userId, workspaceId }) {
                               </div>
                               <span className="text-xs text-slate-500">{formatDateTime(notification.created_at)}</span>
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                              {notification.payload?.task_id ? <span>ID tarea: {notification.payload.task_id.slice(0, 8)}…</span> : null}
-                              {notification.payload?.project_id ? <span>Proyecto: {notification.payload.project_id.slice(0, 8)}…</span> : null}
+                            <div className="mt-2 flex flex-col gap-1 text-xs text-slate-500">
+                              {notification.payload?.task_title ? (
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                  Tarea: {notification.payload.task_title}
+                                </span>
+                              ) : notification.payload?.task_id ? (
+                                <span>ID tarea: {notification.payload.task_id.slice(0, 8)}…</span>
+                              ) : null}
+
+                              {notification.payload?.project_name ? (
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                  Proyecto: {notification.payload.project_name}
+                                </span>
+                              ) : notification.payload?.project_id ? (
+                                <span>Proyecto (ID): {notification.payload.project_id.slice(0, 8)}…</span>
+                              ) : null}
                             </div>
                             {!notification.read ? (
                               <Button

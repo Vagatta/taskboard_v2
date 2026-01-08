@@ -8,7 +8,7 @@ export default function TaskKanbanBoard({ columns, renderTaskCard, onMoveTask })
 
   return (
     <div className="max-h-[640px] overflow-y-auto px-2 pb-2 sm:px-4 sm:pb-4">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         {Object.entries(columns).map(([columnKey, columnTasks]) => (
           <Card
             key={columnKey}
