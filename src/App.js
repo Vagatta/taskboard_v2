@@ -343,6 +343,7 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [initialTaskId, setInitialTaskId] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const { data: userGlobalStats = { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 } } = useUserGlobalStats(user);
 
@@ -769,9 +770,35 @@ function App() {
 
   const sidebarActions =
     user && (
-      <div className="space-y-4">
-        <Button color="info" className="w-full" onClick={handleQuickNewTask}>
-          Crear workspace
+      <div className="flex flex-col gap-2 pt-2">
+        <Button
+          className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white border-0 shadow-md shadow-cyan-500/20 transition-all hover:scale-[1.02] active:scale-95 group"
+          size="sm"
+          onClick={() => {
+            setActivePrimaryView('my-tasks');
+            setPendingAction('create-task');
+          }}
+        >
+          <div className="flex items-center justify-center gap-2 py-0.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+              <path d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span className="font-semibold tracking-wide text-xs">Nueva Tarea</span>
+          </div>
+        </Button>
+
+        <Button
+          color="light"
+          className="w-full border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-95"
+          size="xs"
+          onClick={handleQuickNewTask}
+        >
+          <div className="flex items-center justify-center gap-2 py-0.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75h16.5v16.5H3.75z" />
+            </svg>
+            <span className="font-medium text-[10px]">Crear Workspace</span>
+          </div>
         </Button>
       </div>
     );
@@ -966,7 +993,18 @@ function App() {
     activePrimaryView === 'dashboard'
       ? dashboardSection
       : activePrimaryView === 'my-tasks'
-        ? <MyTasksPanel user={user} />
+        ? (
+          <MyTasksPanel
+            user={user}
+            projects={projects}
+            workspaces={workspaces}
+            setSelectedProjectId={setSelectedProjectId}
+            setActiveManagementTab={setActiveManagementTab}
+            setActivePrimaryView={setActivePrimaryView}
+            pendingAction={pendingAction}
+            onClearPendingAction={() => setPendingAction(null)}
+          />
+        )
         : activePrimaryView === 'notifications'
           ? notificationsSection
           : profileSection;
