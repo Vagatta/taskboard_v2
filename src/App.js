@@ -3,16 +3,14 @@ import { useUserGlobalStats } from './hooks/useSupabaseQueries';
 import { Alert, Button, Card, Checkbox, Label, Spinner, TextInput } from 'flowbite-react';
 import './App.css';
 import AppLayout from './components/AppLayout';
-import WorkspaceManagementPanel from './components/WorkspaceManagementPanel';
-import ProjectsManagementPanel from './components/ProjectsManagementPanel';
-import TasksManagementPanel from './components/TasksManagementPanel';
-import MyTasksPanel from './components/MyTasksPanel';
+import StatsDashboard from './components/StatsDashboard';
 import WorkspacePeopleDashboard from './components/WorkspacePeopleDashboard';
+import ProjectsManagementPanel from './components/ProjectsManagementPanel';
+import MyTasksPanel from './components/MyTasksPanel';
 import UserPanel from './components/UserPanel';
 import NotificationPanel from './components/NotificationPanel';
 import ThemeToggle from './components/ThemeToggle';
-import AcceptInvitation from './components/AcceptInvitation';
-import StatsDashboard from './components/StatsDashboard';
+// import AcceptInvitation from './components/AcceptInvitation'; // Invitation system removed
 import { supabase } from './supabaseClient';
 import QuickSearchModal from './components/QuickSearchModal';
 import { useAuth } from './context/AuthContext';
@@ -38,7 +36,7 @@ const navIcons = {
 
 // Formulario de login/registro con email y contraseña.
 function AuthForm() {
-  const { signIn, signUp, authLoading, error, successMessage, setError, setSuccessMessage, requiresMFA, verifyMFA, cancelMFA, loginWithGoogle } = useAuth();
+  const { signIn, signUp, authLoading, error, successMessage, setError, setSuccessMessage, requiresMFA, verifyMFA, resendMFACode, cancelMFA, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
@@ -86,7 +84,7 @@ function AuthForm() {
           </h1>
           <p className="text-sm text-slate-300/90">
             {mode === 'login'
-              ? 'Inicia sesión para acceder a tus tableros y proyectos.'
+              ? 'Inicia sesión para acceder a tus tableros.'
               : 'Únete a Taskboard y empieza a organizar tus tareas hoy mismo.'}
           </p>
         </div>
@@ -100,7 +98,7 @@ function AuthForm() {
                 type="text"
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value)}
-                placeholder="Ingresa cualquier código de 6 dígitos"
+                placeholder="Ingresa el código de 6 dígitos"
                 required
                 maxLength={6}
                 className="bg-white/5"
@@ -110,18 +108,32 @@ function AuthForm() {
                   id="remember-device"
                   checked={rememberDevice}
                   onChange={(e) => setRememberDevice(e.target.checked)}
+                  className="h-4 w-4 border-white/30 bg-white/10 text-sky-500 checked:bg-sky-500 focus:ring-sky-500 focus:ring-offset-0"
                 />
                 <Label htmlFor="remember-device" className="text-sm font-medium text-slate-300 cursor-pointer">
                   Confiar en este dispositivo (No pedir código en 30 días)
                 </Label>
               </div>
-              <button
-                type="button"
-                onClick={cancelMFA}
-                className="mt-2 text-xs text-slate-400 hover:text-white underline"
-              >
-                Cancelar y volver al login
-              </button>
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={resendMFACode}
+                  disabled={authLoading}
+                  className="text-xs text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1.5"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  ¿No recibiste el código? Reenviar
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelMFA}
+                  className="text-xs text-slate-400 hover:text-white underline text-left"
+                >
+                  Cancelar y volver al login
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -309,10 +321,12 @@ function WelcomeSplashScreen({ theme, onComplete }) {
 
 // Contenedor principal de la app: navegación, paneles de gestión y estado global.
 function App() {
-  const { user, initializing, authLoading, signOut } = useAuth();
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
-  const [workspaces, setWorkspaces] = useState([]);
-  const [workspaceMembers, setWorkspaceMembers] = useState({});
+  const { user, initializing, authLoading, signOut, requiresMFA } = useAuth();
+  const FALLBACK_WORKSPACE_ID = '032c4ce8-fdd0-4a88-b314-ff22f65f52ed';
+  const FIXED_WORKSPACE_ID = process.env.REACT_APP_FIXED_WORKSPACE_ID || FALLBACK_WORKSPACE_ID;
+  const [selectedWorkspaceId] = useState(FIXED_WORKSPACE_ID);
+  const [workspaces] = useState([]);
+  const [workspaceMembers] = useState({});
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [projectMembers, setProjectMembers] = useState({});
@@ -325,9 +339,9 @@ function App() {
     }
     return false; // Por defecto oscuro
   });
-  const [activeManagementTab, setActiveManagementTab] = useState('workspace');
+  const [activeManagementTab, setActiveManagementTab] = useState('tableros');
   const [activePrimaryView, setActivePrimaryView] = useState('dashboard');
-  const [statsWorkspaceId, setStatsWorkspaceId] = useState(null);
+  const [statsWorkspaceId, setStatsWorkspaceId] = useState(FIXED_WORKSPACE_ID);
   const [assigneePreset, setAssigneePreset] = useState(null);
   const [taskSummary, setTaskSummary] = useState({
     total: 0,
@@ -338,27 +352,14 @@ function App() {
   });
   const taskListRef = useRef(null);
 
-  // Detectar si estamos en la página de aceptar invitación
-  const [invitationToken, setInvitationToken] = useState(null);
   const [showSplash, setShowSplash] = useState(true);
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [initialTaskId, setInitialTaskId] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
 
   const { data: userGlobalStats = { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 } } = useUserGlobalStats(user);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (token) {
-      setInvitationToken(token);
-    }
-  }, []);
-
-  const activeWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
-    [selectedWorkspaceId, workspaces]
-  );
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -485,40 +486,18 @@ function App() {
           });
         }
       } catch (err) {
-        console.error('Error cargando stats de proyecto:', err);
+        console.error('Error cargando stats de tablero:', err);
       }
     };
 
     void loadProjectStats();
   }, [selectedProjectId]);
 
-  const handleWorkspaceSelect = useCallback((workspaceId) => {
-    setSelectedWorkspaceId(workspaceId || null);
-    setSelectedProjectId(null);
-    setAssigneePreset(null);
-  }, []);
-
-  const handleWorkspacesChange = useCallback((workspaceList) => {
-    setWorkspaces(workspaceList);
-    if (workspaceList.length === 0) {
-      setSelectedWorkspaceId(null);
-      setStatsWorkspaceId(null);
-    } else if (workspaceList.every((workspace) => workspace.id !== selectedWorkspaceId)) {
-      setSelectedWorkspaceId(workspaceList[0].id);
-      setStatsWorkspaceId(workspaceList[0].id);
-    } else if (!statsWorkspaceId) {
-      setStatsWorkspaceId(selectedWorkspaceId);
-    }
-  }, [selectedWorkspaceId, statsWorkspaceId]);
-
-  const handleWorkspaceMembersChange = useCallback((memberMap) => {
-    setWorkspaceMembers(memberMap);
-  }, []);
 
   const handleProjectSelect = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     if (projectId) {
-      setActiveManagementTab('tareas');
+      setActiveManagementTab('tableros');
     }
   }, []);
 
@@ -572,87 +551,35 @@ function App() {
     }
   }, [isContrastTheme]);
 
-  const handleQuickNewTask = useCallback(() => {
-    setActivePrimaryView('dashboard');
-    setActiveManagementTab('workspace');
-
-    // Pequeño hack: simular clic en la pestaña "Workspace" para forzar que Flowbite actualice su estado interno.
-    setTimeout(() => {
-      try {
-        const tabs = document.querySelectorAll('button[role="tab"]');
-        for (const tab of tabs) {
-          if (tab.textContent?.trim() === 'Workspace') {
-            tab.click();
-            break;
-          }
-        }
-      } catch (error) {
-        // Ignorar si el DOM aún no está listo o no existe la pestaña.
-      }
-    }, 0);
-  }, []);
-
   const breadcrumbs = useMemo(() => {
     const base = [
       {
-        label: 'Inicio',
+        label: 'Tableros',
         onClick: () => {
           setActivePrimaryView('dashboard');
-          setActiveManagementTab('workspace');
+          setActiveManagementTab('tableros');
         }
       }
     ];
-
-    if (activeWorkspace) {
-      base.push({
-        label: activeWorkspace.name,
-        onClick: () => {
-          setActivePrimaryView('dashboard');
-          setActiveManagementTab('workspace');
-        }
-      });
-    }
-
-    base.push({
-      label: 'Proyectos',
-      onClick: () => {
-        setActivePrimaryView('dashboard');
-        setActiveManagementTab('proyectos');
-      }
-    });
-
     if (selectedProject) {
       base.push({ label: selectedProject.name });
     }
     return base;
-  }, [activeWorkspace, selectedProject]);
+  }, [selectedProject]);
 
   const statusItems = useMemo(
     () => [
       {
-        label: 'Workspace activo',
-        value: activeWorkspace ? activeWorkspace.name : 'Ninguno',
-        helper: activeWorkspace ? 'Gestionando proyectos compartidos' : 'Selecciona o crea uno',
-        onClick: () => {
-          setActivePrimaryView('dashboard');
-          setActiveManagementTab('proyectos');
-        }
-      },
-      {
-        label: 'Proyecto activo',
+        label: 'Tablero activo',
         value: selectedProject ? selectedProject.name : 'Ninguno',
-        helper: selectedProject ? 'Gestionando tareas' : 'Elige un proyecto',
+        helper: selectedProject ? 'Gestionando tareas' : 'Elige un tablero',
         onClick: () => {
           setActivePrimaryView('dashboard');
-          if (selectedProject) {
-            setActiveManagementTab('tareas');
-          } else {
-            setActiveManagementTab('proyectos');
-          }
+          setActiveManagementTab('tableros');
         }
       }
     ],
-    [activeWorkspace, selectedProject]
+    [selectedProject]
   );
 
   const layoutTheme = isContrastTheme ? 'light' : 'dark';
@@ -671,16 +598,13 @@ function App() {
       .join('') || 'U';
   }, [userDisplayName]);
 
-  if (showSplash || initializing || authLoading) {
-    return <WelcomeSplashScreen theme={layoutTheme} onComplete={() => setShowSplash(false)} />;
+  if (showSplash || initializing) {
+    return <WelcomeSplashScreen theme={layoutTheme} onComplete={handleSplashComplete} />;
   }
 
-  // Si hay un token de invitación en la URL, mostrar la página de aceptación
-  if (invitationToken) {
-    return <AcceptInvitation />;
-  }
+  // Invitation acceptance removed
 
-  if (!user) {
+  if (!user || requiresMFA) {
     return (
       <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-sky-900 to-indigo-900 px-4 text-slate-50">
         <div className="pointer-events-none absolute inset-0 opacity-40">
@@ -735,9 +659,9 @@ function App() {
       {
         id: 'dashboard',
         label: 'Tablero',
-        description: 'Workspaces, proyectos y tareas',
+        description: 'Workspaces, tableros y tareas',
         active: activePrimaryView === 'dashboard',
-        badge: projects.length > 0 ? `${projects.length} prj.` : undefined,
+        badge: projects.length > 0 ? `${projects.length} tabl.` : undefined,
         icon: navIcons.dashboard,
         onClick: () => setActivePrimaryView('dashboard')
       },
@@ -791,13 +715,13 @@ function App() {
           color="light"
           className="w-full border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-95"
           size="xs"
-          onClick={handleQuickNewTask}
+          onClick={() => { window.location.href = process.env.REACT_APP_BACK_URL || 'https://ventas.kuchen.es/'; }}
         >
           <div className="flex items-center justify-center gap-2 py-0.5">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75h16.5v16.5H3.75z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
-            <span className="font-medium text-[10px]">Crear Workspace</span>
+            <span className="font-medium text-[10px]">Volver a Ventas</span>
           </div>
         </Button>
       </div>
@@ -828,23 +752,9 @@ function App() {
       <div className="flex flex-wrap items-center justify-center gap-4 rounded-3xl border border-slate-200/60 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950/40 p-2 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
         {[
           {
-            id: 'workspace', label: 'Workspace', icon: (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5M12 6.75h1.5M15 6.75h1.5M9 10.5h1.5M12 10.5h1.5M15 10.5h1.5M9 14.25h1.5M12 14.25h1.5M15 14.25h1.5M9 18h1.5M12 18h1.5M15 18h1.5" />
-              </svg>
-            )
-          },
-          {
-            id: 'proyectos', label: 'Proyectos', icon: (
+            id: 'tableros', label: 'Tableros', icon: (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
-              </svg>
-            )
-          },
-          {
-            id: 'tareas', label: 'Tareas', icon: (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
               </svg>
             )
           },
@@ -877,37 +787,19 @@ function App() {
       </div>
 
       <div>
-        {activeManagementTab === 'workspace' && (
-          <WorkspaceManagementPanel
-            user={user}
-            selectedWorkspaceId={selectedWorkspaceId}
-            onSelect={handleWorkspaceSelect}
-            onWorkspacesChange={handleWorkspacesChange}
-            onWorkspaceMembersChange={handleWorkspaceMembersChange}
-          />
-        )}
-        {activeManagementTab === 'proyectos' && (
+        {activeManagementTab === 'tableros' && (
           <ProjectsManagementPanel
-            user={user}
-            selectedWorkspaceId={selectedWorkspaceId}
-            selectedProjectId={selectedProjectId}
-            projects={projects}
-            onProjectSelect={handleProjectSelect}
-            onProjectsChange={handleProjectsChange}
-            onProjectMembersChange={handleProjectMembersChange}
-            workspaceMembers={workspaceMembers}
-          />
-        )}
-        {activeManagementTab === 'tareas' && (
-          <TasksManagementPanel
             user={user}
             selectedWorkspaceId={selectedWorkspaceId}
             selectedProjectId={selectedProjectId}
             selectedProject={selectedProject}
             selectedProjectMembers={selectedProjectMembers}
             projects={projects}
+            onProjectSelect={handleProjectSelect}
+            onProjectsChange={handleProjectsChange}
+            onProjectMembersChange={handleProjectMembersChange}
+            workspaceMembers={workspaceMembers}
             taskListRef={taskListRef}
-
             onTaskSummaryChange={setTaskSummary}
             assigneePreset={assigneePreset}
             initialTaskId={initialTaskId}
@@ -917,7 +809,7 @@ function App() {
           <StatsDashboard
             workspaces={workspaces}
             projects={projects}
-            activeWorkspace={activeWorkspace}
+            activeWorkspace={null}
             workspaceMembers={workspaceMembers}
             selectedProjectMembers={selectedProjectMembers}
             selectedProject={selectedProject}
@@ -934,16 +826,15 @@ function App() {
           workspaceMembers={workspaceMembers}
           onPersonClick={(personId) => {
             setActivePrimaryView('dashboard');
-            setActiveManagementTab('tareas');
+            setActiveManagementTab('tableros');
             setAssigneePreset(personId === null ? 'unassigned' : personId);
           }}
           onTaskClick={(task) => {
             setSelectedProjectId(task.project_id);
             setActivePrimaryView('dashboard');
-            setActiveManagementTab('tareas');
+            setActiveManagementTab('tableros');
             setAssigneePreset('all');
             setInitialTaskId(task.id);
-            // Resetear el ID inicial después de un momento para permitir clics repetidos si fuera necesario
             setTimeout(() => setInitialTaskId(null), 500);
           }}
         />
@@ -1028,7 +919,7 @@ function App() {
         onSelectTask={(task) => {
           setSelectedProjectId(task.project_id);
           setActivePrimaryView('dashboard');
-          setActiveManagementTab('tareas');
+          setActiveManagementTab('tableros');
           setAssigneePreset('all');
           setInitialTaskId(task.id);
           setTimeout(() => setInitialTaskId(null), 500);

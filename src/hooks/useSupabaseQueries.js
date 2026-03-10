@@ -71,7 +71,7 @@ export function useProjects(workspaceId) {
 
             const { data, error } = await supabase
                 .from('projects')
-                .select('id,name,user_id,owner_email,inserted_at,workspace_id')
+                .select('id,name,user_id,owner_email,inserted_at,workspace_id, workspaces(name)')
                 .eq('workspace_id', workspaceId)
                 .order('inserted_at', { ascending: true });
 
@@ -80,7 +80,7 @@ export function useProjects(workspaceId) {
                 if (error.code === '42703') {
                     const { data: fallbackData, error: fallbackError } = await supabase
                         .from('projects')
-                        .select('id,name,user_id,inserted_at,workspace_id')
+                        .select('id,name,user_id,inserted_at,workspace_id, workspaces(name)')
                         .eq('workspace_id', workspaceId)
                         .order('inserted_at', { ascending: true });
 
@@ -136,7 +136,7 @@ export function useUserGlobalStats(user) {
                 .select('*', { count: 'exact', head: true })
                 .eq('user_id', user.id);
 
-            // 2. Conteo de proyectos
+            // 2. Conteo de tableros
             const { count: prjCount } = await supabase
                 .from('project_members')
                 .select('*', { count: 'exact', head: true })

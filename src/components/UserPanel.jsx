@@ -95,8 +95,22 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
   const role = user?.user_metadata?.role ?? 'Miembro';
   const company = user?.user_metadata?.company ?? 'Organización no definida';
   const bio = user?.user_metadata?.bio ?? '';
-  const authProvider = user?.app_metadata?.provider ?? 'email';
-  const canManagePassword = true;
+  const appMeta = user?.app_metadata || {};
+  const userMeta = user?.user_metadata || {};
+  const providers = appMeta.providers || [];
+
+  // Detección ultra-robusta: buscamos rastro de login social en cualquier parte
+  const isOAuthUser =
+    providers.some(p => p !== 'email' && p !== 'password') ||
+    (appMeta.provider && appMeta.provider !== 'email' && appMeta.provider !== 'password') ||
+    !!userMeta.iss || // Issuer (típico de Google/Azure)
+    !!userMeta.sub || // Subject
+    userMeta.provider_id;
+
+  const authProvider = appMeta.provider || (providers.find(p => p !== 'email' && p !== 'password') || (providers.length > 0 ? providers[0] : 'email'));
+
+  // Solo requiere password si el usuario NO es OAuth y el campo existe
+  const canManagePassword = !isOAuthUser && (authProvider === 'email' || authProvider === 'password');
 
   const initials = getInitials(displayName);
 
@@ -113,7 +127,7 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
     bio
   });
   const [securitySettings, setSecuritySettings] = useState({
-    mfa: user?.user_metadata?.mfa ?? true,
+    mfa: user?.user_metadata?.mfa ?? false,
     newDeviceAlerts: user?.user_metadata?.newDeviceAlerts ?? true,
     autoSignOut: user?.user_metadata?.autoSignOut ?? false
   });
@@ -520,7 +534,7 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
                 <ToggleRow
                   id="notify-summary"
                   label="Resumen Semanal Digest"
-                  description="Informe consolidado de tus proyectos y tareas"
+                  description="Informe consolidado de tus tableros y tareas"
                   checked={notificationSettings.weeklySummary}
                   onChange={(value) => setNotificationSettings((prev) => ({ ...prev, weeklySummary: value }))}
                   icon={<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
@@ -555,57 +569,93 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
 
   async function handleSavePreference(section) {
     if (section === 'security') {
-      const requiresCurrentPassword = authProvider === 'email' || authProvider === 'password';
+      // Redefinir aquí dentro para máxima seguridad y evitar cierres de variables obsoletos
+      const userMeta = user?.user_metadata || {};
+      const isOAuth =
+        providers.some(p => p !== 'email' && p !== 'password') ||
+        (appMeta.provider && appMeta.provider !== 'email' && appMeta.provider !== 'password') ||
+        !!userMeta.iss || !!userMeta.sub || !!userMeta.avatar_url; // Avatar URL suele venir de OAuth
 
-      if (requiresCurrentPassword && !passwordForm.current) {
-        setSecurityError('Introduce tu contraseña actual.');
-        return;
-      }
-      if (!passwordForm.next || !passwordForm.confirm) {
-        setSecurityError('Introduce y confirma la nueva contraseña.');
-        return;
-      }
-      if (passwordForm.next.length < 8) {
-        setSecurityError('La nueva contraseña debe tener al menos 8 caracteres.');
-        return;
-      }
-      if (passwordForm.next !== passwordForm.confirm) {
-        setSecurityError('Las contraseñas no coinciden.');
-        return;
+      const primaryProv = appMeta.provider || (providers.find(p => p !== 'email' && p !== 'password')) || 'email';
+
+      // Un usuario SOLO requiere password si NO es OAuth y tiene proveedor email/password
+      const requiresPW = !isOAuth && (primaryProv === 'email' || primaryProv === 'password' || providers.includes('email'));
+
+      // Validación interna: solo si requiere contraseña y está intentando cambiarla
+      if (requiresPW && (passwordForm.next || passwordForm.confirm)) {
+        if (!passwordForm.current) {
+          setSecurityError('Introduce tu contraseña actual para confirmar el cambio de contraseña.');
+          return;
+        }
+        if (passwordForm.next !== passwordForm.confirm) {
+          setSecurityError('Las nuevas contraseñas no coinciden.');
+          return;
+        }
+        if (passwordForm.next.length < 8) {
+          setSecurityError('La nueva contraseña debe tener al menos 8 caracteres.');
+          return;
+        }
       }
 
       setSecurityError('');
       setSecuritySaving(true);
 
       try {
-        if (requiresCurrentPassword) {
-          const { error: reauthError } = await supabase.auth.signInWithPassword({
-            email,
-            password: passwordForm.current
-          });
+        console.log('[AuthDebug] Acción Seguridad:', {
+          isOAuth,
+          primaryProv,
+          requiresPW,
+          providers,
+          email,
+          mfaTarget: securitySettings.mfa
+        });
 
-          if (reauthError) {
-            setSecurityError('La contraseña actual no es válida.');
-            return;
+        // SOLO re-autenticamos si el usuario intenta CAMBIAR su contraseña
+        // Para cambios de MFA/Alertas, no es necesario re-autenticar (lo maneja el flujo de MFA si fuera real)
+        const isChangingPassword = !!(passwordForm.next || passwordForm.confirm);
+
+        if (requiresPW && isChangingPassword) {
+          console.log('[AuthDebug] Re-autenticando usuario de email con:', email);
+          if (passwordForm.current) {
+            const { error: reauthError } = await supabase.auth.signInWithPassword({
+              email: email,
+              password: passwordForm.current
+            });
+
+            if (reauthError) {
+              console.error('[AuthDebug] Error de re-autenticación:', reauthError);
+              throw new Error(`Contraseña actual incorrecta: ${reauthError.message}`);
+            }
           }
         }
+
+        console.log('[AuthDebug] Enviando actualización de metadatos:', {
+          mfa: securitySettings.mfa,
+          alerts: securitySettings.newDeviceAlerts
+        });
+
+        // Obtener metadatos actuales para no sobrescribir info de Google (como el avatar)
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const currentMetadata = currentUser?.user_metadata || {};
 
         const { error: updateError } = await supabase.auth.updateUser({
           password: passwordForm.next || undefined,
           data: {
+            ...currentMetadata,
             mfa: securitySettings.mfa,
             newDeviceAlerts: securitySettings.newDeviceAlerts,
             autoSignOut: securitySettings.autoSignOut
           }
         });
 
-        if (updateError) {
-          setSecurityError(updateError.message);
-          return;
-        }
+        if (updateError) throw updateError;
 
+        console.log('[AuthDebug] Metadatos actualizados con éxito');
         setPasswordForm({ current: '', next: '', confirm: '' });
         setFeedback({ section: 'security', message: 'Configuración de seguridad actualizada correctamente.' });
+      } catch (err) {
+        console.error('[AuthDebug] Error al guardar seguridad:', err);
+        setSecurityError(`Error al guardar: ${err.message || 'Error desconocido'}`);
       } finally {
         setSecuritySaving(false);
       }
@@ -707,7 +757,7 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
         </div>
 
         <div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
-          <UserStatCard title="Proyectos" value={stats.projects} description="Participando" icon={Icons.projects} color="blue" />
+          <UserStatCard title="Tableros" value={stats.projects} description="Participando" icon={Icons.projects} color="blue" />
           <UserStatCard title="Tareas" value={stats.tasks} description="Asignadas" icon={Icons.tasks} color="indigo" />
           <UserStatCard title="Completadas" value={stats.completed} description="Histórico" icon={Icons.completed} color="emerald" />
           <UserStatCard title="Colaboradores" value={stats.collaborators} description="Trabajando contigo" icon={Icons.collaborators} color="amber" />
@@ -764,9 +814,13 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
               </div>
 
               {feedback ? (
-                <Alert color="info" onDismiss={() => setFeedback(null)} className="mt-8 border border-cyan-500/20 bg-cyan-500/5 text-xs text-cyan-900 dark:text-cyan-100 shadow-sm">
+                <Alert
+                  color="info"
+                  onDismiss={() => setFeedback(null)}
+                  className="mt-8 border border-cyan-600 bg-cyan-600 text-xs text-white dark:bg-cyan-500 dark:text-white shadow-lg"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
                     <span className="font-medium">{feedback.message}</span>

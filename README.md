@@ -22,7 +22,6 @@
 - **Múltiples vistas**: Lista, Kanban, Secciones
 
 ### Gestión de Tareas
-- **Creación rápida** con atajos de teclado (`Ctrl+G`)
 - **Asignación de responsables** y fechas límite
 - **Sistema de prioridades** (Alta, Media, Baja)
 - **Estados personalizables**: Pendiente, En progreso, Completada

@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import VoiceRecorder from './VoiceRecorder';
 
 // Comentarios de una tarea: lista, creación rápida, menciones y algo de control de permisos.
-export default function TaskComments({ taskId, taskTitle, currentUserId, members = [], workspaceId = null, projectId = null, isOwner = false, ownerLabel = 'Dueño del Proyecto', projectName = null }) {
+export default function TaskComments({ taskId, taskTitle, currentUserId, members = [], workspaceId = null, projectId = null, isOwner = false, ownerLabel = 'Dueño del Tablero', projectName = null }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +46,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
   const permissionMessage = currentUserId
     ? currentMember
       ? `Tu rol (${currentMember.role}) no permite publicar comentarios.`
-      : 'No perteneces a este proyecto, por lo que no puedes comentar.'
+      : 'No perteneces a este tablero, por lo que no puedes comentar.'
     : 'Inicia sesión para poder comentar.';
 
   const mentionableMembers = useMemo(
@@ -339,7 +339,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
       const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
       const base64Content = await fileToBase64(file);
 
-      const prompt = `Analiza esta imagen adjunta a una tarea de gestión de proyectos. 
+      const prompt = `Analiza esta imagen adjunta a una tarea de gestión de tableros. 
       Título de la tarea: "${taskTitle}"
       Si la imagen muestra un error técnico o de diseño, identifícalo y sugiere una solución paso a paso. 
       Si es una referencia visual, descríbela para el equipo. 

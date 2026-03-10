@@ -14,7 +14,6 @@ const getRequiredEnvVar = (name) => {
   return value;
 };
 
-const isBrowser = typeof window !== 'undefined';
 
 const supabaseUrl = getRequiredEnvVar('REACT_APP_SUPABASE_URL');
 const supabaseAnonKey = getRequiredEnvVar('REACT_APP_SUPABASE_ANON_KEY');

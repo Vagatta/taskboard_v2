@@ -98,7 +98,7 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
         <header className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">Resumen de menciones</p>
-            <p className="text-xs text-slate-500">Últimas referencias directas a miembros del proyecto.</p>
+            <p className="text-xs text-slate-500">Últimas referencias directas a colaboradores del tablero.</p>
           </div>
           {loading ? <Spinner size="sm" /> : null}
         </header>
@@ -110,7 +110,7 @@ export default function MentionDigest({ projectId, members = [], limit = 25 }) {
         ) : null}
 
         {!projectId ? (
-          <p className="text-sm text-slate-500">Selecciona un proyecto para ver las menciones.</p>
+          <p className="text-sm text-slate-500">Selecciona un tablero para ver las menciones.</p>
         ) : mentions.length === 0 ? (
           <p className="text-sm text-slate-500">Sin menciones recientes.</p>
         ) : (

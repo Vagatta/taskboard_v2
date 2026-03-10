@@ -30,8 +30,8 @@ export default function CookieConsent() {
 
     return (
         <>
-            <div className="fixed bottom-0 left-0 right-0 z-[100] animate-in fade-in slide-in-from-bottom-full duration-700">
-                <div className="border-t border-white/20 bg-slate-900/90 p-4 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/95">
+            <div className="sticky bottom-0 w-full z-[100] pb-4 animate-in fade-in slide-in-from-bottom-full duration-700">
+                <div className="border-t border-white/20 bg-slate-900/90 p-4 shadow-2xl backdrop-blur-2xl rounded-2xl dark:border-white/10 dark:bg-slate-950/95">
                     <div className="mx-auto max-w-7xl">
                         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between px-2">
                             <div className="flex items-center gap-4 text-center sm:text-left">

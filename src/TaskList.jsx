@@ -1,13 +1,13 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, Select, Spinner } from 'flowbite-react';
-import DailyFlash from './components/DailyFlash';
 import ActivityLog from './components/ActivityLog';
 import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
-import TaskSectionsBoard from './components/TaskSectionsBoard';
+import CustomBoardView from './components/CustomBoardView';
 import TaskKanbanBoard from './components/TaskKanbanBoard';
 import TaskCreatePanel from './components/TaskCreatePanel';
 import TaskFiltersPanel from './components/TaskFiltersPanel';
+import JotformImporter from './components/JotformImporter';
 import { supabase } from './supabaseClient';
 import { playSuccessSound } from './utils/audioHelpers';
 import { calculateStreak, formatRelativeTime, humanizeEventType, parseDateInput } from './utils/dateHelpers';
@@ -15,22 +15,16 @@ import confetti from 'canvas-confetti';
 
 // Vista principal del tablero: lista, kanban, filtros, detalles y todo lo que pasa alrededor de las tareas.
 const TaskList = forwardRef(function TaskList(
-  { user, projectId, project, members = [], workspaceId = null, assigneePreset = null, onViewModeChange, onTaskSummaryChange, initialTaskId = null },
+  { user, projectId, project, members = [], workspaceId = null, assigneePreset = null, onViewModeChange, onTaskSummaryChange, initialTaskId = null, defaultViewMode = 'list' },
   ref
 ) {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
 
 
-  const [showDailyFlash, setShowDailyFlash] = useState(false);
+  const taskListRef = useRef(null);
+  const lastSummaryRef = useRef(null);
   const lastProjectRef = useRef(null);
-
-  useEffect(() => {
-    if (projectId && projectId !== lastProjectRef.current) {
-      setShowDailyFlash(true);
-      lastProjectRef.current = projectId;
-    }
-  }, [projectId]);
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('medium');
   const [newTaskEffort, setNewTaskEffort] = useState('m');
@@ -54,7 +48,7 @@ const TaskList = forwardRef(function TaskList(
   const [onlyMentionedFilter, setOnlyMentionedFilter] = useState(false);
   const [taskToolsTab, setTaskToolsTab] = useState('search');
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(defaultViewMode);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -62,7 +56,6 @@ const TaskList = forwardRef(function TaskList(
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
-  const [sectionsGrouping, setSectionsGrouping] = useState('dates');
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [activeTasksSection, setActiveTasksSection] = useState('tasks');
   const newTaskInputRef = useRef(null);
@@ -279,7 +272,7 @@ const TaskList = forwardRef(function TaskList(
   const dueBeforeDate = useMemo(() => parseDateInput(dueBeforeFilter, { endOfDay: true }), [dueBeforeFilter]);
   const completedBeforeDate = useMemo(() => parseDateInput(completedBeforeFilter, { endOfDay: true }), [completedBeforeFilter]);
 
-  // Presencia en tiempo real en el proyecto.
+  // Presencia en tiempo real en el tablero.
   useEffect(() => {
     if (!userId || !projectId) {
       return undefined;
@@ -704,96 +697,6 @@ const TaskList = forwardRef(function TaskList(
     [filteredTasks.length, loading, projectId, totalTasks]
   );
 
-  const timelineStartDate = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
-  }, []);
-
-  const timelineDays = useMemo(() => {
-    return Array.from({ length: 14 }, (_, index) => {
-      const date = new Date(timelineStartDate);
-      date.setDate(date.getDate() + index);
-      return date;
-    });
-  }, [timelineStartDate]);
-
-  const timelineEndDate = useMemo(() => {
-    const lastDay = new Date(timelineDays[timelineDays.length - 1] ?? timelineStartDate);
-    lastDay.setHours(23, 59, 59, 999);
-    return lastDay;
-  }, [timelineDays, timelineStartDate]);
-
-  const timelineDayKeys = useMemo(() => timelineDays.map((day) => day.toISOString().split('T')[0]), [timelineDays]);
-
-
-
-  const timelineBuckets = useMemo(() => {
-    const dayMap = timelineDayKeys.reduce((accumulator, key) => {
-      accumulator[key] = [];
-      return accumulator;
-    }, {});
-    const overdue = [];
-    const undated = [];
-    const later = [];
-
-    filteredTasks.forEach((task) => {
-      if (!task.due_date) {
-        undated.push(task);
-        return;
-      }
-
-      const dueDate = new Date(task.due_date);
-      const key = dueDate.toISOString().split('T')[0];
-
-      if (dueDate < timelineStartDate) {
-        overdue.push(task);
-        return;
-      }
-
-      if (dueDate > timelineEndDate) {
-        later.push(task);
-        return;
-      }
-
-      if (!dayMap[key]) {
-        dayMap[key] = [];
-      }
-
-      dayMap[key].push(task);
-    });
-
-    Object.values(dayMap).forEach((dayTasks) => {
-      dayTasks.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-    });
-
-    return {
-      dayMap,
-      overdue,
-      undated,
-      later
-    };
-  }, [filteredTasks, timelineDayKeys, timelineEndDate, timelineStartDate]);
-
-  const timelineDayFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat('es-ES', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short'
-      }),
-    []
-  );
-
-  const timelineTimeFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-    []
-  );
-
   const recalcSubtaskStats = useCallback((taskId, list) => {
     setSubtaskMeta((previous) => ({
       ...previous,
@@ -1030,7 +933,7 @@ const TaskList = forwardRef(function TaskList(
       }));
 
       const prompt = `
-        Actúa como un experto gestor de proyectos. Analiza las siguientes tareas pendientes y asígnales una prioridad ("high", "medium" o "low") optimizada para maximizar la productividad, considerando sus títulos y fechas de entrega (si las tienen).
+        Actúa como un experto gestor de tableros. Analiza las siguientes tareas pendientes y asígnales una prioridad ("high", "medium" o "low") optimizada para maximizar la productividad, considerando sus títulos y fechas de entrega (si las tienen).
         Tareas: ${JSON.stringify(tasksSummary)}
 
         Devuelve ÚNICAMENTE un array JSON de objetos con este formato: [{"id": "uuid-de-la-tarea", "priority": "high|medium|low"}].
@@ -1231,110 +1134,6 @@ const TaskList = forwardRef(function TaskList(
     }),
     [sortedTasks]
   );
-
-  const boardSections = useMemo(() => {
-    if (sectionsGrouping === 'epic') {
-      const groups = new Map();
-
-      for (const task of filteredTasks) {
-        const rawEpic = typeof task.epic === 'string' ? task.epic.trim() : '';
-        const label = rawEpic.length > 0 ? rawEpic : 'Sin epic / grupo';
-        if (!groups.has(label)) {
-          groups.set(label, []);
-        }
-        groups.get(label).push(task);
-      }
-
-      const entries = Array.from(groups.entries()).sort(([firstLabel], [secondLabel]) =>
-        firstLabel.localeCompare(secondLabel, 'es', { sensitivity: 'base' })
-      );
-
-      return entries.map(([label, tasksForSection]) => {
-        const slug = label
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/gi, '') || 'sin-epic';
-
-        return {
-          id: `epic-${slug}`,
-          title: label,
-          emptyLabel: 'Sin tareas en este grupo.',
-          tasks: tasksForSection
-        };
-      });
-    }
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
-
-    const nextWeekEnd = new Date(todayStart);
-    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-
-    const recentThreshold = new Date();
-    recentThreshold.setDate(recentThreshold.getDate() - 2);
-
-    const sectionMatchers = [
-      {
-        id: 'recent',
-        title: 'Asignadas recientemente',
-        emptyLabel: 'Sin tareas recientes.',
-        match: (task) => {
-          const updatedAt = task.updated_at ? new Date(task.updated_at) : null;
-          const insertedAt = task.inserted_at ? new Date(task.inserted_at) : null;
-          const reference = updatedAt ?? insertedAt;
-          return Boolean(reference && reference >= recentThreshold);
-        }
-      },
-      {
-        id: 'today',
-        title: 'Para hacer hoy',
-        emptyLabel: 'No hay tareas para hoy.',
-        match: (task) => {
-          if (!task.due_date) return false;
-          const due = new Date(task.due_date);
-          return due >= todayStart && due < todayEnd;
-        }
-      },
-      {
-        id: 'soon',
-        title: 'Próximamente',
-        emptyLabel: 'Nada programado en los próximos días.',
-        match: (task) => {
-          if (!task.due_date) return false;
-          const due = new Date(task.due_date);
-          return due >= todayEnd && due <= nextWeekEnd;
-        }
-      },
-      {
-        id: 'later',
-        title: 'Para más tarde',
-        emptyLabel: 'Todo al día.',
-        match: () => true
-      }
-    ];
-
-    const assignedIds = new Set();
-
-    return sectionMatchers.map((section) => {
-      const tasksForSection = filteredTasks.filter((task) => {
-        if (assignedIds.has(task.id)) {
-          return false;
-        }
-        if (!section.match(task)) {
-          return false;
-        }
-        assignedIds.add(task.id);
-        return true;
-      });
-
-      return {
-        ...section,
-        tasks: tasksForSection
-      };
-    });
-  }, [filteredTasks, sectionsGrouping]);
 
 
   const addTask = useCallback(
@@ -1581,6 +1380,7 @@ const TaskList = forwardRef(function TaskList(
     [projectId, selectedTaskIds, userId]
   );
 
+  // eslint-disable-next-line no-unused-vars
   const handleBulkUpdateAssignee = useCallback(
     async (assigneeId) => {
       if (!projectId || !userId || selectedTaskIds.length === 0) {
@@ -1648,7 +1448,7 @@ const TaskList = forwardRef(function TaskList(
     if (!projectId) {
       return (
         <Card>
-          <p className="text-sm text-slate-500">Selecciona un proyecto para ver sus tareas.</p>
+          <p className="text-sm text-slate-500">Selecciona un tablero para ver sus tareas.</p>
         </Card>
       );
     }
@@ -1673,7 +1473,7 @@ const TaskList = forwardRef(function TaskList(
       return (
         <Card>
           <p className="text-sm text-slate-500">
-            Aún no hay tareas en este proyecto. Crea la primera usando el formulario superior.
+            Aún no hay tareas en este tablero. Crea la primera usando el formulario superior.
           </p>
         </Card>
       );
@@ -2145,7 +1945,7 @@ const TaskList = forwardRef(function TaskList(
         if (typeof parsed.searchQuery === 'string') {
           setSearchQuery(parsed.searchQuery);
         }
-        if (parsed.viewMode && ['list', 'kanban', 'timeline', 'sections'].includes(parsed.viewMode)) {
+        if (parsed.viewMode && ['list', 'kanban', 'calendar', 'boards'].includes(parsed.viewMode)) {
           setViewMode(parsed.viewMode);
         }
         if (typeof parsed.createdFromFilter === 'string') {
@@ -2244,7 +2044,7 @@ const TaskList = forwardRef(function TaskList(
         }
       },
       toggleViewMode: () => {
-        const sequence = ['list', 'kanban', 'timeline', 'calendar', 'sections'];
+        const sequence = ['list', 'kanban', 'calendar', 'boards'];
         setViewMode((previous) => {
           const currentIndex = sequence.indexOf(previous);
           if (currentIndex === -1) {
@@ -2273,7 +2073,7 @@ const TaskList = forwardRef(function TaskList(
       const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
       const assigneeLabel = assigneeMember?.member_email ?? (task.assigned_to ? 'Colaborador' : 'Sin asignar');
       const creatorMember = task.created_by ? membersById[task.created_by] : null;
-      const creatorLabel = creatorMember?.member_email ?? task.owner_email ?? 'Dueño del Proyecto';
+      const creatorLabel = creatorMember?.member_email ?? task.owner_email ?? 'Dueño del Tablero';
       const updaterMember = task.updated_by ? membersById[task.updated_by] : null;
       const updaterLabel = updaterMember?.member_email ?? (task.updated_by ? 'Colaborador' : 'Sin registro');
       const lastCommentAt = taskCommentMeta[task.id] ? new Date(taskCommentMeta[task.id]) : null;
@@ -2429,7 +2229,7 @@ const TaskList = forwardRef(function TaskList(
                 ) : null}
               </div>
             ) : (
-              <p className="text-xs text-slate-500">Añade miembros al proyecto para asignar tareas.</p>
+              <p className="text-xs text-slate-500">No hay otros colaboradores en este tablero.</p>
             )}
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <Button
@@ -2484,13 +2284,21 @@ const TaskList = forwardRef(function TaskList(
       return;
     }
 
-    onTaskSummaryChange({
+    const summary = {
       total: totalTasks,
       pending: pendingCount,
       completed: completedCount,
       completedOnTime: completionStats.completedOnTime,
       completedLate: completionStats.completedLate
-    });
+    };
+
+    const summaryStr = JSON.stringify(summary);
+    if (lastSummaryRef.current === summaryStr) {
+      return;
+    }
+
+    lastSummaryRef.current = summaryStr;
+    onTaskSummaryChange(summary);
   }, [completedCount, completionStats.completedLate, completionStats.completedOnTime, onTaskSummaryChange, pendingCount, totalTasks]);
 
   useEffect(() => {
@@ -2498,9 +2306,9 @@ const TaskList = forwardRef(function TaskList(
       return;
     }
     const latest = tasks.find((task) => task.id === selectedTaskDetail.id);
-    if (latest) {
+    if (latest && JSON.stringify(latest) !== JSON.stringify(selectedTaskDetail)) {
       setSelectedTaskDetail(latest);
-    } else {
+    } else if (!latest) {
       setSelectedTaskDetail(null);
     }
   }, [selectedTaskDetail, tasks]);
@@ -2552,93 +2360,6 @@ const TaskList = forwardRef(function TaskList(
           renderTaskCard={renderTaskCard}
           onMoveTask={handleMoveTaskInKanban}
         />
-      );
-    }
-
-    if (mode === 'timeline') {
-      const { dayMap, overdue, undated, later } = timelineBuckets;
-
-      const renderTaskChip = (task) => {
-        const dueDate = task.due_date ? new Date(task.due_date) : null;
-        const timeLabel = dueDate ? timelineTimeFormatter.format(dueDate) : null;
-        const isAuthUserAssignee = task.assigned_to === userId;
-
-        return (
-          <button
-            key={task.id}
-            type="button"
-            className={`w-full rounded-xl border p-2 text-left text-xs transition-colors ${isAuthUserAssignee
-              ? 'border-cyan-500/40 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-100 hover:bg-cyan-200 dark:hover:bg-cyan-900/50'
-              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-700 dark:text-slate-200 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/40'
-              }`}
-            onClick={() => {
-              setSelectedTaskDetail(task);
-              setViewMode('detail');
-              setActiveTasksSection('tasks');
-            }}
-          >
-            {timeLabel ? <span className="mr-1 text-[10px] text-slate-400">{timeLabel}</span> : null}
-            <span className={task.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-slate-100'}>{task.title}</span>
-          </button>
-        );
-      };
-
-      return (
-        <div className="space-y-4">
-          {overdue.length > 0 ? (
-            <Card className="bg-white dark:bg-slate-950/40">
-              <div className="mb-2 text-xs font-semibold text-rose-700 dark:text-rose-200">Vencidas</div>
-              <div className="space-y-2">
-                {overdue.map((task) => renderTaskChip(task))}
-              </div>
-            </Card>
-          ) : null}
-
-          <div className="overflow-x-auto pb-2">
-            <div className="flex min-w-max gap-3">
-              {timelineDays.map((day) => {
-                const key = day.toISOString().split('T')[0];
-                const dayTasks = dayMap[key] ?? [];
-                return (
-                  <Card key={key} className="min-w-[180px] bg-white dark:bg-slate-950/40">
-                    <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
-                      <span className="font-semibold text-slate-900 dark:text-white">{timelineDayFormatter.format(day)}</span>
-                      <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {dayTasks.length === 0 ? (
-                        <p className="text-[11px] text-slate-500">Sin tareas para este día.</p>
-                      ) : (
-                        dayTasks.map((task) => renderTaskChip(task))
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-
-          {(later.length > 0 || undated.length > 0) && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {later.length > 0 ? (
-                <Card className="bg-white dark:bg-slate-950/40">
-                  <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Más adelante</div>
-                  <div className="space-y-2">
-                    {later.map((task) => renderTaskChip(task))}
-                  </div>
-                </Card>
-              ) : null}
-              {undated.length > 0 ? (
-                <Card className="bg-white dark:bg-slate-950/40">
-                  <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Sin fecha</div>
-                  <div className="space-y-2">
-                    {undated.map((task) => renderTaskChip(task))}
-                  </div>
-                </Card>
-              ) : null}
-            </div>
-          )}
-        </div>
       );
     }
 
@@ -2838,48 +2559,25 @@ const TaskList = forwardRef(function TaskList(
       );
     }
 
-    if (mode === 'sections') {
-      const handleMoveTaskInSections = (taskId, targetSectionId) => {
-        if (sectionsGrouping !== 'epic') {
-          return;
-        }
-
-        const task = tasks.find((item) => item.id === taskId);
-        if (!task) {
-          return;
-        }
-
-        const targetSection = boardSections.find((section) => section.id === targetSectionId);
-        if (!targetSection) {
-          return;
-        }
-
-        // En agrupación por epic, el título de la sección es el valor del epic (o "Sin epic / grupo").
-        const rawLabel = targetSection.title || '';
-        const nextEpic = rawLabel.startsWith('Sin epic') ? '' : rawLabel;
-
-        void updateTaskEpic(task, nextEpic);
-      };
-
+    if (mode === 'boards') {
       return (
-        <TaskSectionsBoard
-          sections={boardSections}
-          sectionsGrouping={sectionsGrouping}
-          onChangeSectionsGrouping={setSectionsGrouping}
+        <CustomBoardView
+          projectId={projectId}
+          userId={userId}
+          tasks={filteredTasks}
           membersById={membersById}
-          onToggleTaskCompletion={toggleTaskCompletion}
           onSelectTask={(task) => {
             setSelectedTaskDetail(task);
             setViewMode('detail');
             setActiveTasksSection('tasks');
           }}
+          onToggleTaskCompletion={toggleTaskCompletion}
           onFocusNewTaskInput={() => {
             setShowCreatePanel(true);
             requestAnimationFrame(() => {
               newTaskInputRef.current?.focus?.();
             });
           }}
-          onMoveTask={handleMoveTaskInSections}
         />
       );
     }
@@ -2889,97 +2587,91 @@ const TaskList = forwardRef(function TaskList(
 
   const listContent = renderListView;
   const kanbanContent = renderModeContent('kanban');
-  const timelineContent = renderModeContent('timeline');
   const calendarContent = renderModeContent('calendar');
-  const sectionsContent = renderModeContent('sections');
+  const boardsContent = renderModeContent('boards');
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-400">Proyecto activo</p>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{project?.name ?? 'Sin proyecto seleccionado'}</h2>
-              <p className="text-xs text-slate-500">Propietario: {projectOwnerLabel}</p>
-            </div>
+        <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Tablero activo</p>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{project?.name ?? 'Sin tablero seleccionado'}</h2>
+                <p className="text-xs text-slate-500">Propietario: {projectOwnerLabel}</p>
+              </div>
 
-            {/* Burbujas de Presencia */}
-            {projectViewers.length > 0 && (
-              <div className="flex flex-col items-end gap-1 px-4">
-                <div className="flex -space-x-2">
-                  {projectViewers.slice(0, 5).map((viewer, idx) => {
-                    const member = membersById[viewer.userId];
-                    const initials = member?.member_email?.[0].toUpperCase() || '?';
-                    return (
-                      <div
-                        key={viewer.userId}
-                        title={member?.member_email || 'Cargando...'}
-                        className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-slate-100 dark:border-slate-900 dark:bg-slate-800"
-                        style={{ zIndex: 10 - idx }}
-                      >
-                        {member?.avatar_url ? (
-                          <img src={member.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            {initials}
-                          </div>
-                        )}
-                        <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-slate-900" />
+              {/* Burbujas de Presencia */}
+              {projectViewers.length > 0 && (
+                <div className="flex flex-col items-end gap-1 px-4">
+                  <div className="flex -space-x-2">
+                    {projectViewers.slice(0, 5).map((viewer, idx) => {
+                      const member = membersById[viewer.userId];
+                      const initials = member?.member_email?.[0].toUpperCase() || '?';
+                      return (
+                        <div
+                          key={viewer.userId}
+                          title={member?.member_email || 'Cargando...'}
+                          className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-slate-100 dark:border-slate-900 dark:bg-slate-800"
+                          style={{ zIndex: 10 - idx }}
+                        >
+                          {member?.avatar_url ? (
+                            <img src={member.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                              {initials}
+                            </div>
+                          )}
+                          <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-slate-900" />
+                        </div>
+                      );
+                    })}
+                    {projectViewers.length > 5 && (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-[10px] font-bold text-slate-600 dark:border-slate-900 dark:bg-slate-700 dark:text-slate-300">
+                        +{projectViewers.length - 5}
                       </div>
-                    );
-                  })}
-                  {projectViewers.length > 5 && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-[10px] font-bold text-slate-600 dark:border-slate-900 dark:bg-slate-700 dark:text-slate-300">
-                      +{projectViewers.length - 5}
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <p className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                    {projectViewers.length} {projectViewers.length === 1 ? 'activo' : 'activos'}
+                  </p>
                 </div>
-                <p className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                  {projectViewers.length} {projectViewers.length === 1 ? 'activo' : 'activos'}
-                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <div className="flex flex-col items-center text-center">
+                <p className="text-slate-500">Total</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">{totalTasks}</p>
               </div>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
-            <div className="flex flex-col items-center text-center">
-              <p className="text-slate-500">Total</p>
-              <p className="text-base font-semibold text-slate-900 dark:text-white">{totalTasks}</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <p className="text-slate-500">Pendientes</p>
-              <p className="text-base font-semibold text-slate-900 dark:text-white">{pendingCount}</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <p className="text-slate-500">Completadas</p>
-              <p className="text-base font-semibold text-slate-900 dark:text-white">{completedCount}</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <p className="text-slate-500">Altas atrasadas</p>
-              <p className="text-base font-semibold text-rose-600 dark:text-rose-300">{highPriorityStats.overdue}</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <p className="text-slate-500">Altas hoy</p>
-              <p className="text-base font-semibold text-amber-600 dark:text-amber-200">{highPriorityStats.dueToday}</p>
-            </div>
-            {productivityStreak > 0 && (
-              <div className="flex flex-col items-center text-center px-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                <p className="text-[10px] uppercase font-bold text-orange-600 dark:text-orange-400">Racha 🔥</p>
-                <p className="text-base font-black text-orange-600 dark:text-orange-400">
-                  {productivityStreak} {productivityStreak === 1 ? 'Día' : 'Días'}
-                </p>
+              <div className="flex flex-col items-center text-center">
+                <p className="text-slate-500">Pendientes</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">{pendingCount}</p>
               </div>
-            )}
+              <div className="flex flex-col items-center text-center">
+                <p className="text-slate-500">Completadas</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">{completedCount}</p>
+              </div>
+              <div className="flex flex-col items-center text-center">
+                <p className="text-slate-500">Altas atrasadas</p>
+                <p className="text-base font-semibold text-rose-600 dark:text-rose-300">{highPriorityStats.overdue}</p>
+              </div>
+              <div className="flex flex-col items-center text-center">
+                <p className="text-slate-500">Altas hoy</p>
+                <p className="text-base font-semibold text-amber-600 dark:text-amber-200">{highPriorityStats.dueToday}</p>
+              </div>
+              {productivityStreak > 0 && (
+                <div className="flex flex-col items-center text-center px-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                  <p className="text-[10px] uppercase font-bold text-orange-600 dark:text-orange-400">Racha 🔥</p>
+                  <p className="text-base font-black text-orange-600 dark:text-orange-400">
+                    {productivityStreak} {productivityStreak === 1 ? 'Día' : 'Días'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {showDailyFlash && projectId && (
-        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-          <DailyFlash projectId={projectId} onClose={() => setShowDailyFlash(false)} />
-        </div>
-      )}
-
+      {/* Notificaciones y Digest local al tablero */}
       <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-950/40 backdrop-blur-xl shadow-lg shadow-slate-200/20 dark:shadow-black/20">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1">
@@ -3037,28 +2729,17 @@ const TaskList = forwardRef(function TaskList(
                       )
                     },
                     {
-                      id: 'ai-prioritize', label: 'Priorizar con IA', icon: (
+                      id: 'import-csv', label: 'Importar CSV', icon: (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                         </svg>
-                      ),
-                      onClick: handleAutoPrioritize
+                      )
+                    },
+                    {
+
                     }
                   ].map((tool) => {
-                    if (tool.id === 'ai-prioritize') {
-                      return (
-                        <button
-                          key={tool.id}
-                          type="button"
-                          disabled={addingTask}
-                          onClick={tool.onClick}
-                          className="flex items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/5 px-3 py-2 text-xs font-medium text-purple-600 transition-all hover:bg-purple-500/10 dark:text-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        >
-                          {tool.icon}
-                          <span>{tool.label}</span>
-                        </button>
-                      );
-                    }
+
                     const isActive = taskToolsTab === tool.id;
                     return (
                       <button
@@ -3141,6 +2822,20 @@ const TaskList = forwardRef(function TaskList(
                       />
                     </div>
                   )}
+
+                  {taskToolsTab === 'import-csv' && (
+                    <div className="mt-2">
+                      <JotformImporter
+                        projectId={projectId}
+                        userId={userId}
+                        userEmail={userEmail}
+                        onImportComplete={(count) => {
+                          loadTasks();
+                          setTaskToolsTab('search');
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950/30 backdrop-blur-lg p-3">
@@ -3161,13 +2856,6 @@ const TaskList = forwardRef(function TaskList(
                         )
                       },
                       {
-                        id: 'timeline', label: 'Timeline', icon: (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
-                          </svg>
-                        )
-                      },
-                      {
                         id: 'calendar', label: 'Calendario', icon: (
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
@@ -3175,10 +2863,9 @@ const TaskList = forwardRef(function TaskList(
                         )
                       },
                       {
-                        id: 'sections', label: 'Tablón', icon: (
+                        id: 'boards', label: 'Tablones', icon: (
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
                           </svg>
                         )
                       },
@@ -3215,9 +2902,8 @@ const TaskList = forwardRef(function TaskList(
                   <div>
                     {viewMode === 'list' && <div className="mt-4">{listContent}</div>}
                     {viewMode === 'kanban' && <div className="mt-4">{kanbanContent}</div>}
-                    {viewMode === 'timeline' && <div className="mt-4">{timelineContent}</div>}
                     {viewMode === 'calendar' && <div className="mt-4">{calendarContent}</div>}
-                    {viewMode === 'sections' && <div className="mt-4">{sectionsContent}</div>}
+                    {viewMode === 'boards' && <div className="mt-4">{boardsContent}</div>}
                     {viewMode === 'detail' && selectedTaskDetail && (
                       <div className="mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4 overflow-hidden min-w-0">
                         <TaskDetailPanel

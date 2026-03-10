@@ -14,14 +14,27 @@ export default function ProjectSelector({
   onProjectMembersChange
 }) {
   const queryClient = useQueryClient();
-  const { data: projects = [], isLoading: loadingProjects } = useProjects(workspaceId);
-  const { data: members = [] } = useProjectMembers(selectedProjectId);
+  const { data: projectsData = [], isLoading: loadingProjects } = useProjects(workspaceId);
+  const projects = projectsData || [];
+  const { data: membersData = [] } = useProjectMembers(selectedProjectId);
+  const members = membersData || [];
 
   // Derive active project members map for compatibility
   const membersByProject = useMemo(() => {
     if (!selectedProjectId) return {};
     return { [selectedProjectId]: members };
   }, [selectedProjectId, members]);
+
+  // Calculate current user's roles for permission checks
+  const currentUserProjectRole = useMemo(() =>
+    members.find(m => m.member_id === user?.id)?.role,
+    [members, user?.id]
+  );
+  const currentUserWorkspaceRole = useMemo(() =>
+    (workspaceMembers[workspaceId] ?? []).find(m => m.member_id === user?.id)?.role,
+    [workspaceMembers, workspaceId, user?.id]
+  );
+  const canManageMembers = currentUserProjectRole === 'owner' || currentUserWorkspaceRole === 'owner';
 
 
   const [creating, setCreating] = useState(false);
@@ -44,22 +57,20 @@ export default function ProjectSelector({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteEmailRole, setInviteEmailRole] = useState('editor');
   const [invitingEmail, setInvitingEmail] = useState(false);
-  const [workspaceInviteEmail, setWorkspaceInviteEmail] = useState('');
-  const [invitingToWorkspace, setInvitingToWorkspace] = useState(false);
 
   // Sync projects with parent
   useEffect(() => {
     if (projects) {
       onProjectsChange?.(projects);
     }
-  }, [projects, onProjectsChange]);
+  }, [JSON.stringify(projects), onProjectsChange]);
 
   // Sync members with parent
   useEffect(() => {
     if (onProjectMembersChange) {
       onProjectMembersChange(membersByProject);
     }
-  }, [membersByProject, onProjectMembersChange]);
+  }, [JSON.stringify(membersByProject), onProjectMembersChange]);
 
   // Notification state
   const [notification, setNotification] = useState(null);
@@ -309,7 +320,7 @@ export default function ProjectSelector({
       }
 
       if (targetMember.role === 'owner') {
-        setError('No puedes eliminar al propietario del proyecto.');
+        setError('No puedes eliminar al propietario del tablero.');
         return;
       }
 
@@ -360,7 +371,7 @@ export default function ProjectSelector({
 
     const targetProject = projects.find((project) => project.id === selectedProjectId);
     if (!targetProject) {
-      setError('Selecciona un proyecto válido.');
+      setError('Selecciona un tablero válido.');
       setInviting(false);
       return;
     }
@@ -439,54 +450,6 @@ export default function ProjectSelector({
     }
   };
 
-  const handleInviteToWorkspace = async (e) => {
-    e.preventDefault();
-    if (!workspaceId || !user) return;
-
-    const email = workspaceInviteEmail.trim();
-    if (!email) {
-      setError('Ingresa un correo electrónico válido.');
-      return;
-    }
-
-    setInvitingToWorkspace(true);
-    setError('');
-
-    try {
-      // 1. Check if user is already a member
-      const { error: checkError } = await supabase
-        .from('workspace_members')
-        .select('id')
-        .eq('workspace_id', workspaceId)
-        .eq('user_id', user.id) // This checks if current user is member, not the invited one. Wait, we need to check if target email is already member?
-        // Actually, RPC usually handles logic, but let's just try to insert invitation.
-        // It's safer to just insert invitation and let DB constraint handle duplicates.
-        .limit(1);
-
-      if (checkError) throw checkError;
-
-      // 2. Create Workspace Invitation
-      const { error: inviteError } = await supabase
-        .from('workspace_invitations')
-        .insert({
-          workspace_id: workspaceId,
-          email: email,
-          role: 'editor', // Default role for now, simpler
-          invited_by: user.id
-        });
-
-      if (inviteError) throw inviteError;
-
-      setWorkspaceInviteEmail('');
-      setWorkspaceInviteEmail('');
-      showNotification(`Invitación al workspace enviada a ${email}`, 'success');
-    } catch (err) {
-      console.error(err);
-      setError(err.message || 'Error al invitar al workspace');
-    } finally {
-      setInvitingToWorkspace(false);
-    }
-  };
 
   const loadPendingInvitations = useCallback(async () => {
     if (!selectedProjectId) {
@@ -506,7 +469,7 @@ export default function ProjectSelector({
       if (invError) throw invError;
       setPendingInvitations(data ?? []);
     } catch (err) {
-      console.error('Error cargando invitaciones del proyecto:', err);
+      console.error('Error cargando invitaciones del tablero:', err);
     } finally {
       setLoadingInvitations(false);
     }
@@ -538,10 +501,10 @@ export default function ProjectSelector({
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Proyectos disponibles</h2>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Tableros disponibles</h2>
               {loadingProjects ? <Spinner size="sm" /> : null}
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Selecciona un proyecto para visualizar tus tareas.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Selecciona un tablero para visualizar tus tareas.</p>
           </div>
           <Button onClick={handleRefresh} color="dark" disabled={loadingProjects}>
             Actualizar listado
@@ -560,28 +523,28 @@ export default function ProjectSelector({
 
         {!workspaceId ? (
           <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-6 text-sm text-slate-600 dark:text-slate-400">
-            Selecciona un workspace para administrar sus proyectos.
+            Selecciona un workspace para administrar sus tableros.
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/30 p-2">
             <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
               {[
                 {
-                  id: 'projects', label: 'Proyectos', icon: (
+                  id: 'projects', label: 'Tableros', icon: (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
                     </svg>
                   )
                 },
                 {
-                  id: 'create', label: 'Crear proyecto', icon: (
+                  id: 'create', label: 'Crear tablero', icon: (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                   )
                 },
                 {
-                  id: 'invite', label: 'Invitar miembros', disabled: !selectedProjectId, icon: (
+                  id: 'invite', label: 'Invitar colaboradores', disabled: !selectedProjectId || !canManageMembers, icon: (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3.75 15a2.25 2.25 0 0 1 2.25-2.25h6a2.25 2.25 0 0 1 2.25 2.25v1.5H3.75v-1.5Z" />
                     </svg>
@@ -619,7 +582,7 @@ export default function ProjectSelector({
                     projects.map((project) => {
                       const isActive = project.id === selectedProjectId;
                       const ownerLabel =
-                        project.owner_email || (user?.id === project.user_id ? user?.email : 'Dueño del Proyecto');
+                        project.owner_email || (user?.id === project.user_id ? user?.email : 'Dueño del Tablero');
                       const createdAt = project.inserted_at ? new Date(project.inserted_at) : null;
                       const isNotifiable = notifiableProjects.includes(project.id);
 
@@ -656,8 +619,8 @@ export default function ProjectSelector({
                                 <Tooltip
                                   content={
                                     isNotifiable
-                                      ? 'Notificaciones activadas para este proyecto.'
-                                      : 'Notificaciones desactivadas para este proyecto.'
+                                      ? 'Notificaciones activadas para este tablero.'
+                                      : 'Notificaciones desactivadas para este tablero.'
                                   }
                                   placement="bottom"
                                   className="text-slate-900 dark:text-white"
@@ -676,8 +639,8 @@ export default function ProjectSelector({
                                       aria-pressed={isNotifiable}
                                       aria-label={
                                         isNotifiable
-                                          ? 'Desactivar notificaciones por correo de este proyecto'
-                                          : 'Activar notificaciones por correo de este proyecto'
+                                          ? 'Desactivar notificaciones por correo de este tablero'
+                                          : 'Activar notificaciones por correo de este tablero'
                                       }
                                     >
                                       🔔
@@ -721,7 +684,7 @@ export default function ProjectSelector({
                     })
                   ) : (
                     <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-6 text-sm text-slate-600 dark:text-slate-400">
-                      Aún no tienes proyectos. Crea uno nuevo para comenzar.
+                      Aún no tienes tableros. Crea uno nuevo para comenzar.
                     </div>
                   )}
 
@@ -729,7 +692,7 @@ export default function ProjectSelector({
                     <section className="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 shadow-none p-4">
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Miembros del proyecto</h3>
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Miembros del tablero</h3>
                           <p className="text-xs text-slate-500">
                             Cambia los roles o elimina miembros que ya no deban colaborar.
                           </p>
@@ -757,7 +720,7 @@ export default function ProjectSelector({
                                   <Select
                                     sizing="sm"
                                     value={member.role}
-                                    disabled={isOwner || isBusy}
+                                    disabled={isOwner || isBusy || !canManageMembers}
                                     onChange={(event) =>
                                       handleMemberRoleUpdate(member.project_id, member.member_id, event.target.value)
                                     }
@@ -772,7 +735,7 @@ export default function ProjectSelector({
                                       color="failure"
                                       size="xs"
                                       pill
-                                      disabled={isBusy}
+                                      disabled={isBusy || !canManageMembers}
                                       onClick={() => handleMemberRemoval(member.project_id, member.member_id)}
                                     >
                                       {isRemoving ? 'Eliminando...' : 'Eliminar'}
@@ -785,7 +748,7 @@ export default function ProjectSelector({
                         </div>
                       ) : (
                         <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-4 text-xs text-slate-600 dark:text-slate-400">
-                          No hay miembros registrados para este proyecto.
+                          No hay miembros registrados para este tablero.
                         </p>
                       )}
                     </section>
@@ -795,11 +758,11 @@ export default function ProjectSelector({
 
               {activeTab === 'create' && (
                 <div className="mt-4 space-y-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Crear nuevo proyecto</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Crear nuevo tablero</p>
                   <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleCreateProject}>
                     <div className="flex-1 space-y-2">
                       <label className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400" htmlFor="new-project">
-                        Nuevo proyecto
+                        Nuevo tablero
                       </label>
                       <TextInput
                         id="new-project"
@@ -808,7 +771,7 @@ export default function ProjectSelector({
                           setNewProjectName(event.target.value);
                           setError('');
                         }}
-                        placeholder="Nombre del proyecto"
+                        placeholder="Nombre del tablero"
                         maxLength={120}
                         disabled={!workspaceId || creating || !user}
                       />
@@ -819,7 +782,7 @@ export default function ProjectSelector({
                       disabled={creating || !user || !workspaceId}
                       className="whitespace-nowrap"
                     >
-                      {creating ? 'Creando...' : 'Crear proyecto'}
+                      {creating ? 'Creando...' : 'Crear tablero'}
                     </Button>
                   </form>
                 </div>
@@ -829,7 +792,7 @@ export default function ProjectSelector({
                 <div className="mt-4 space-y-3">
                   {selectedProjectId ? (
                     <>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Agregar miembro del workspace</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Agregar colaborador al tablero</p>
                       <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleInviteMember}>
                         <div className="flex-1 space-y-2">
                           <label className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400" htmlFor="invite-member">
@@ -935,7 +898,7 @@ export default function ProjectSelector({
                       ) : pendingInvitations.length > 0 ? (
                         <div className="mt-6 space-y-3">
                           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                            Invitaciones Pendientes del Proyecto ({pendingInvitations.length})
+                            Invitaciones Pendientes del Tablero ({pendingInvitations.length})
                           </h3>
                           <div className="space-y-2">
                             {pendingInvitations.map((invitation) => {
@@ -995,52 +958,17 @@ export default function ProjectSelector({
                             })}
                           </div>
                           <p className="text-xs text-slate-500">
-                            Nota: Cuando estos usuarios acepten la invitación, podrás agregarlos al proyecto desde el selector de arriba.
+                            Nota: Cuando estos usuarios acepten la invitación, podrás agregarlos al tablero desde el selector de arriba.
                           </p>
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-500 mt-4">No hay invitaciones pendientes en este proyecto.</p>
+                        <p className="text-xs text-slate-500 mt-4">No hay invitaciones pendientes en este tablero.</p>
                       )}
 
-                      {/* NUEVA SECCIÓN: Invitar al Workspace */}
-                      <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
-                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
-                          Invitar usuarios al Workspace
-                        </h3>
-                        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-                          Si el usuario no aparece en la lista de "Agregar miembro del workspace", primero tienes que invitarlo al Workspace aquí.
-                        </p>
-                        <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleInviteToWorkspace}>
-                          <div className="flex-1 space-y-2">
-                            <label className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400" htmlFor="workspace-invite-email">
-                              Correo electrónico
-                            </label>
-                            <TextInput
-                              id="workspace-invite-email"
-                              type="email"
-                              placeholder="nuevo.usuario@ejemplo.com"
-                              value={workspaceInviteEmail}
-                              onChange={(e) => {
-                                setWorkspaceInviteEmail(e.target.value);
-                                setError('');
-                              }}
-                              disabled={invitingToWorkspace}
-                            />
-                          </div>
-                          <Button
-                            type="submit"
-                            color="dark"
-                            disabled={invitingToWorkspace || !workspaceInviteEmail.trim()}
-                            className="sm:w-auto"
-                          >
-                            {invitingToWorkspace ? 'Enviando...' : 'Invitar al Workspace'}
-                          </Button>
-                        </form>
-                      </div>
 
                     </>
                   ) : (
-                    <p className="text-xs text-slate-500">Selecciona primero un proyecto para poder invitar miembros.</p>
+                    <p className="text-xs text-slate-500">Selecciona primero un tablero para poder invitar colaboradores.</p>
                   )}
                 </div>
               )}

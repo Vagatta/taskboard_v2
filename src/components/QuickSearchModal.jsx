@@ -49,7 +49,7 @@ export default function QuickSearchModal({
                         </div>
                     </div>
                     <TextInput
-                        placeholder="Busca proyectos o workspaces..."
+                        placeholder="Busca tableros o workspaces..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         autoFocus
@@ -77,7 +77,7 @@ export default function QuickSearchModal({
                                         <span className="font-medium text-slate-900 dark:text-slate-100">{item.name}</span>
                                     </div>
                                     <Badge color={item.type === 'workspace' ? 'info' : 'purple'}>
-                                        {item.type === 'workspace' ? 'Workspace' : 'Proyecto'}
+                                        {item.type === 'workspace' ? 'Workspace' : 'Tablero'}
                                     </Badge>
                                 </button>
                             ))

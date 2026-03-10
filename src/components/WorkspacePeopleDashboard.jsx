@@ -194,7 +194,7 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
     // Pie de página
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184);
-    doc.text('Generado automáticamente por Taskboard - Inteligencia en Gestión de Proyectos', pageWidth / 2, 285, { align: 'center' });
+    doc.text('Generado automáticamente por Taskboard - Inteligencia en Gestión de Tableros', pageWidth / 2, 285, { align: 'center' });
 
     doc.save(`Reporte_Productividad_${workspaceId}.pdf`);
   };
@@ -213,7 +213,7 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Colaboradores</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-white">Tareas por persona</p>
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">Tareas por tablero</p>
             <p className="text-xs text-slate-500 mt-0.5">Reporte de carga en el workspace</p>
           </div>
           <Button
@@ -247,14 +247,14 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
           </div>
           <div className="hidden lg:block w-px h-8 bg-slate-200 dark:bg-slate-800" />
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-16 sm:w-auto">Proyecto</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-16 sm:w-auto">Tablero</span>
             <Select
               sizing="sm"
               value={projectFilter}
               onChange={(event) => setProjectFilter(event.target.value)}
               className="flex-1 lg:w-44"
             >
-              <option value="all">Todos los proyectos</option>
+              <option value="all">Todos los tableros</option>
               {projectsForFilter.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -327,7 +327,7 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
                   <div className="space-y-1 text-xs text-slate-300">
                     {person.tasks.slice(0, 5).map((task) => {
                       const project = person.projectById[task.project_id];
-                      const projectLabel = project?.name ?? task.project_id ?? 'Sin proyecto';
+                      const projectLabel = project?.name ?? task.project_id ?? 'Sin tablero';
                       const dueDate = task.due_date ? new Date(task.due_date) : null;
                       const dueLabel = dueDate
                         ? new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit' }).format(dueDate)

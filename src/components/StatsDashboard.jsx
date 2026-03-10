@@ -129,7 +129,7 @@ export default function StatsDashboard({
                     color="blue"
                 />
                 <StatCard
-                    title="Proyectos"
+                    title="Tableros"
                     value={projects.length}
                     subtitle="En el workspace actual"
                     icon={Icons.projects}
@@ -143,9 +143,9 @@ export default function StatsDashboard({
                     color="emerald"
                 />
                 <StatCard
-                    title="Equipo Proyecto"
+                    title="Equipo Tablero"
                     value={selectedProjectMembers.length}
-                    subtitle={selectedProject ? 'En el proyecto activo' : 'Selecciona un proyecto'}
+                    subtitle={selectedProject ? 'En el tablero activo' : 'Selecciona un tablero'}
                     icon={Icons.members}
                     color="amber"
                 />
@@ -157,7 +157,7 @@ export default function StatsDashboard({
                 <div className="lg:col-span-2 rounded-3xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-900/60 p-6 shadow-xl backdrop-blur-md">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Tareas del Proyecto Activo</h4>
+                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Tareas del Tablero Activo</h4>
                             <p className="text-sm text-slate-500">Progreso y cumplimiento de plazos</p>
                         </div>
                         <div className="text-right">
@@ -245,7 +245,7 @@ export default function StatsDashboard({
                             Has completado <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{globalStats.completed}</span> tareas en toda la plataforma
                         </h3>
                         <p className="mt-4 text-slate-400 text-sm max-w-md">
-                            Tu productividad impulsa el éxito de {globalStats.workspaces} workspaces y {globalStats.projects} proyectos activos. ¡Sigue así!
+                            Tu productividad impulsa el éxito de {globalStats.workspaces} workspaces y {globalStats.projects} tableros activos. ¡Sigue así!
                         </p>
                     </div>
 

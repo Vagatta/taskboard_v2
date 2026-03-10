@@ -14,7 +14,7 @@ export default function TaskDetailPanel({
   projectId = null,
   currentUserId = null,
   isOwner = false,
-  ownerLabel = 'Dueño del Proyecto',
+  ownerLabel = 'Dueño del Tablero',
   onClose,
   activityMeta,
   lastCommentAt,
@@ -55,6 +55,7 @@ export default function TaskDetailPanel({
       setEpicValue('');
       return;
     }
+
     setEpicValue(task.epic ?? '');
   }, [task]);
 
@@ -138,6 +139,7 @@ export default function TaskDetailPanel({
   const completedSubtasks = subtasks.filter((item) => item.completed).length;
   const isAssigned = Boolean(task.assigned_to);
   const tags = Array.isArray(task.tags) ? task.tags : [];
+  const solicitudDetails = extractSolicitudDetails(task.description);
   const activeViewers = viewers
     .map((viewer) => membersById[viewer.userId] ?? membersById[viewer.user_id])
     .filter(Boolean);
@@ -376,12 +378,16 @@ export default function TaskDetailPanel({
           <nav className="flex whitespace-nowrap px-4 pb-1 gap-4">
             {[
               { id: 'summary', label: 'Resumen' },
+              { id: 'solicitud', label: 'Solicitud KH', hidden: solicitudDetails.length === 0 },
               { id: 'assignee', label: 'Responsable' },
               { id: 'properties', label: 'Propiedades' },
               { id: 'activity', label: 'Actividad' },
               { id: 'subtasks', label: 'Subtareas' },
               { id: 'comments', label: 'Comentarios' }
             ].map((tab) => {
+              if (tab.hidden) {
+                return null;
+              }
               const isActive = mobileActiveTab === tab.id;
               return (
                 <button
@@ -407,8 +413,12 @@ export default function TaskDetailPanel({
           {mobileActiveTab === 'summary' && (
             <div className="space-y-4">
               <TaskSummarySection creator={creator} updater={updater} task={task} ownerLabel={ownerLabel} />
+              {solicitudDetails.length > 0 && <TaskSolicitudSection details={solicitudDetails} />}
               <TaskTimelineSection createdAt={createdAt} dueDate={dueDate} completedAt={completedAt} />
             </div>
+          )}
+          {mobileActiveTab === 'solicitud' && solicitudDetails.length > 0 && (
+            <TaskSolicitudSection details={solicitudDetails} />
           )}
           {mobileActiveTab === 'assignee' && (
             <TaskAssigneeSection
@@ -479,6 +489,17 @@ export default function TaskDetailPanel({
                       </svg>
                     )
                   },
+                  solicitudDetails.length > 0
+                    ? {
+                      id: 'solicitud',
+                      label: 'Solicitud KH',
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+                        </svg>
+                      )
+                    }
+                    : null,
                   {
                     id: 'assignee', label: 'Responsable', icon: (
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
@@ -493,7 +514,7 @@ export default function TaskDetailPanel({
                       </svg>
                     )
                   }
-                ].map((tab) => {
+                ].filter(Boolean).map((tab) => {
                   const isActive = activeLeftTab === tab.id;
                   return (
                     <button
@@ -518,6 +539,9 @@ export default function TaskDetailPanel({
                     <TaskSummarySection creator={creator} updater={updater} task={task} ownerLabel={ownerLabel} />
                     <TaskTimelineSection createdAt={createdAt} dueDate={dueDate} completedAt={completedAt} />
                   </div>
+                )}
+                {activeLeftTab === 'solicitud' && solicitudDetails.length > 0 && (
+                  <TaskSolicitudSection details={solicitudDetails} />
                 )}
                 {activeLeftTab === 'assignee' && (
                   <div className="space-y-4">
@@ -666,6 +690,33 @@ export default function TaskDetailPanel({
   );
 }
 
+function TaskSolicitudSection({ details = [] }) {
+  if (!Array.isArray(details) || details.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-950/20 p-4 shadow-sm">
+      <header className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+        Solicitud del cliente
+      </header>
+      <dl className="grid gap-3 text-sm text-slate-700 dark:text-slate-200 sm:grid-cols-2">
+        {details.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="rounded-lg bg-slate-100/70 dark:bg-slate-900/40 p-3">
+            {item.label ? (
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</dt>
+            ) : null}
+            <dd className="mt-0.5 break-words text-sm">
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function TaskHeader({ task, statusMeta, priorityMeta, dueDate, viewerNames, onClose, isFocusMode, onToggleFocus }) {
   return (
     <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-800/60 pb-4">
@@ -725,7 +776,7 @@ function TaskSummarySection({ creator, updater, task, ownerLabel }) {
   const items = [
     { label: 'Autor', value: creator?.member_email ?? task.owner_email ?? ownerLabel },
     { label: 'Última edición', value: updater?.member_email ?? (task.updated_by ? (task.updated_by === task.created_by ? ownerLabel : 'Colaborador') : 'Sin registro') }
-  ];
+  ].filter((item) => Boolean(item.value));
 
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
@@ -758,7 +809,7 @@ function TaskAssigneeSection({
     <section className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 shadow-none p-4 text-sm text-slate-700 dark:text-slate-200">
       <p className="text-xs uppercase tracking-wide text-slate-500">Responsable</p>
       {members.length === 0 ? (
-        <p className="text-xs text-slate-500">Añade miembros al proyecto para poder asignar esta tarea.</p>
+        <p className="text-xs text-slate-500">Añade colaboradores al tablero con el selector de tableros principal para poder asignar esta tarea.</p>
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Select
@@ -1150,6 +1201,26 @@ function SubtaskCreateForm({ creatingSubtask, newSubtask, onNewSubtaskChange, on
       </Button>
     </form>
   );
+}
+
+function extractSolicitudDetails(description) {
+  if (!description || typeof description !== 'string') {
+    return [];
+  }
+
+  const tokens = description
+    .split(/\n+/)
+    .flatMap((line) => line.split('|'))
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  return tokens.map((token) => {
+    const match = token.match(/^([^:]+):\s*(.+)$/);
+    if (match) {
+      return { label: match[1].trim(), value: match[2].trim() };
+    }
+    return { label: '', value: token };
+  });
 }
 
 

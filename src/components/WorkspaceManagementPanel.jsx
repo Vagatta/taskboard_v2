@@ -6,7 +6,9 @@ export default function WorkspaceManagementPanel({
   selectedWorkspaceId,
   onSelect,
   onWorkspacesChange,
-  onWorkspaceMembersChange
+  onWorkspaceMembersChange,
+  pendingAction,
+  onClearPendingAction
 }) {
   return (
     <div className="space-y-6">
@@ -16,6 +18,8 @@ export default function WorkspaceManagementPanel({
         onSelect={onSelect}
         onWorkspacesChange={onWorkspacesChange}
         onWorkspaceMembersChange={onWorkspaceMembersChange}
+        pendingAction={pendingAction}
+        onClearPendingAction={onClearPendingAction}
       />
     </div>
   );

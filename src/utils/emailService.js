@@ -19,15 +19,15 @@ import nodemailer from 'nodemailer';
 
 // Configuración del transportador de email
 const createTransporter = () => {
-    return nodemailer.createTransport({
-        host: process.env.REACT_APP_SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.REACT_APP_SMTP_PORT || '587'),
-        secure: false, // true para 465, false para otros puertos
-        auth: {
-            user: process.env.REACT_APP_SMTP_USER,
-            pass: process.env.REACT_APP_SMTP_PASS,
-        },
-    });
+  return nodemailer.createTransport({
+    host: process.env.REACT_APP_SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.REACT_APP_SMTP_PORT || '587'),
+    secure: false, // true para 465, false para otros puertos
+    auth: {
+      user: process.env.REACT_APP_SMTP_USER,
+      pass: process.env.REACT_APP_SMTP_PASS,
+    },
+  });
 };
 
 /**
@@ -42,33 +42,33 @@ const createTransporter = () => {
  * @returns {Promise<boolean>} - true si se envió correctamente
  */
 export const sendInvitationEmail = async ({
-    toEmail,
-    workspaceName,
-    inviterName,
-    inviterEmail,
-    token,
-    role
+  toEmail,
+  workspaceName,
+  inviterName,
+  inviterEmail,
+  token,
+  role
 }) => {
-    try {
-        const transporter = createTransporter();
+  try {
+    const transporter = createTransporter();
 
-        const baseUrl = process.env.REACT_APP_BASE_URL || 'http://localhost:3000';
-        const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
+    const baseUrl = process.env.REACT_APP_BASE_URL || 'http://localhost:3000';
+    const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
 
-        // Traducir rol al español
-        const roleTranslations = {
-            owner: 'Propietario',
-            editor: 'Editor',
-            viewer: 'Lector'
-        };
-        const roleSpanish = roleTranslations[role] || role;
+    // Traducir rol al español
+    const roleTranslations = {
+      owner: 'Propietario',
+      editor: 'Editor',
+      viewer: 'Lector'
+    };
+    const roleSpanish = roleTranslations[role] || role;
 
-        const mailOptions = {
-            from: `"Taskboard" <${process.env.REACT_APP_SMTP_USER}>`,
-            to: toEmail,
-            replyTo: inviterEmail,
-            subject: `Invitación a workspace: ${workspaceName}`,
-            html: `
+    const mailOptions = {
+      from: `"Taskboard" <${process.env.REACT_APP_SMTP_USER}>`,
+      to: toEmail,
+      replyTo: inviterEmail,
+      subject: `Invitación a workspace: ${workspaceName}`,
+      html: `
         <!DOCTYPE html>
         <html lang="es">
         <head>
@@ -175,7 +175,7 @@ export const sendInvitationEmail = async ({
                 <p style="margin: 8px 0 0 0;"><strong>Rol asignado:</strong> ${roleSpanish}</p>
               </div>
               
-              <p>Taskboard es una herramienta de gestión de tareas colaborativa que te permitirá organizar proyectos, asignar tareas y trabajar en equipo de manera eficiente.</p>
+              <p>Taskboard es una herramienta de gestión de tareas colaborativa que te permitirá organizar tableros, asignar tareas y trabajar en equipo de manera eficiente.</p>
               
               <div style="text-align: center;">
                 <a href="${inviteUrl}" class="cta-button">Aceptar Invitación</a>
@@ -197,7 +197,7 @@ export const sendInvitationEmail = async ({
         </body>
         </html>
       `,
-            text: `
+      text: `
 ¡Has sido invitado a ${workspaceName}!
 
 ${inviterName} (${inviterEmail}) te ha invitado a unirte a su workspace en Taskboard como ${roleSpanish}.
@@ -209,14 +209,14 @@ Esta invitación expira en 7 días.
 
 Si no esperabas esta invitación, puedes ignorar este mensaje.
       `.trim()
-        };
+    };
 
-        await transporter.sendMail(mailOptions);
-        return true;
-    } catch (error) {
-        console.error('Error enviando email de invitación:', error);
-        throw new Error(`Error al enviar email: ${error.message}`);
-    }
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Error enviando email de invitación:', error);
+    throw new Error(`Error al enviar email: ${error.message}`);
+  }
 };
 
 /**
@@ -224,12 +224,12 @@ Si no esperabas esta invitación, puedes ignorar este mensaje.
  * @returns {Promise<boolean>} - true si la configuración es válida
  */
 export const verifyEmailConfig = async () => {
-    try {
-        const transporter = createTransporter();
-        await transporter.verify();
-        return true;
-    } catch (error) {
-        console.error('Error en configuración SMTP:', error);
-        return false;
-    }
+  try {
+    const transporter = createTransporter();
+    await transporter.verify();
+    return true;
+  } catch (error) {
+    console.error('Error en configuración SMTP:', error);
+    return false;
+  }
 };

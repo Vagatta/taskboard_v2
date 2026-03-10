@@ -24,10 +24,10 @@ export default function AppLayout({
     <div className="space-y-8">
       <header className="flex flex-col gap-4">
         {breadcrumbs.length > 0 ? (
-          <nav aria-label="Ruta" className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500 overflow-x-auto no-scrollbar whitespace-nowrap mask-linear-fade">
+          <nav aria-label="Ruta" className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 overflow-x-auto no-scrollbar whitespace-nowrap pl-1">
             <ol className="flex items-center gap-2">
               {breadcrumbs.map((crumb, index) => (
-                <li key={`${crumb.label}-${index}`} className="flex items-center gap-2 text-slate-500 dark:text-slate-500">
+                <li key={`${crumb.label}-${index}`} className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   {crumb.href ? (
                     <a href={crumb.href} className="max-w-[100px] sm:max-w-none truncate transition hover:text-slate-900 dark:hover:text-slate-200">
                       {crumb.label}
@@ -36,12 +36,12 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={crumb.onClick}
-                      className="max-w-[100px] sm:max-w-none truncate transition hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none"
+                      className="max-w-[100px] sm:max-w-none truncate transition text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus:outline-none"
                     >
                       {crumb.label}
                     </button>
                   ) : (
-                    <span className="text-slate-400 dark:text-slate-400">{crumb.label}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{crumb.label}</span>
                   )}
                   {index < breadcrumbs.length - 1 ? <span className="text-slate-400 dark:text-slate-600">/</span> : null}
                 </li>

@@ -1,6 +1,6 @@
 import TaskList from '../TaskList';
 
-// Panel que conecta workspace/proyecto seleccionados con la vista principal de tareas.
+// Panel que conecta workspace/tablero seleccionados con la vista principal de tareas.
 export default function TasksManagementPanel({
   user,
   selectedWorkspaceId,
@@ -16,19 +16,12 @@ export default function TasksManagementPanel({
 }) {
   return (
     <div className="space-y-6">
-      {!selectedWorkspaceId ? (
+      {projects.length === 0 ? (
         <div
           className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
           aria-live="polite"
         >
-          Selecciona un workspace para ver tareas.
-        </div>
-      ) : projects.length === 0 ? (
-        <div
-          className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
-          aria-live="polite"
-        >
-          Crea un proyecto antes de gestionar tareas.
+          Crea o selecciona un tablero antes de gestionar tareas.
         </div>
       ) : selectedProjectId && selectedProject ? (
         <TaskList
@@ -48,7 +41,7 @@ export default function TasksManagementPanel({
           className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/10 p-8 text-center text-sm text-slate-600 dark:text-slate-400"
           aria-live="polite"
         >
-          Selecciona un proyecto para ver sus tareas.
+          Selecciona un tablero para ver sus tareas.
         </div>
       )}
     </div>

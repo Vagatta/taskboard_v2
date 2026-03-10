@@ -282,10 +282,10 @@ export default function NotificationPanel({ userId, workspaceId }) {
 
                               {notification.payload?.project_name ? (
                                 <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                  Proyecto: {notification.payload.project_name}
+                                  Tablero: {notification.payload.project_name}
                                 </span>
                               ) : notification.payload?.project_id ? (
-                                <span>Proyecto (ID): {notification.payload.project_id.slice(0, 8)}…</span>
+                                <span>Tablero (ID): {notification.payload.project_id.slice(0, 8)}…</span>
                               ) : null}
                             </div>
                             {!notification.read ? (
