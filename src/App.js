@@ -357,6 +357,8 @@ function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [initialTaskId, setInitialTaskId] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [invitationStatus, setInvitationStatus] = useState({ processing: false, type: null, message: '' });
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const { data: userGlobalStats = { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 } } = useUserGlobalStats(user);
 
@@ -394,6 +396,115 @@ function App() {
       events.forEach(event => window.removeEventListener(event, resetTimer));
     };
   }, [user, signOut]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (!token) {
+      if (invitationStatus.processing || invitationStatus.type) {
+        setInvitationStatus({ processing: false, type: null, message: '' });
+      }
+      return;
+    }
+
+    if (!user) {
+      setInvitationStatus({
+        processing: false,
+        type: 'info',
+        message: 'Inicia sesión con el correo invitado para aceptar tu invitación.'
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    const acceptInvitation = async () => {
+      setInvitationStatus({ processing: true, type: 'info', message: 'Aceptando invitación...' });
+
+      try {
+        const { data: invitationLookup, error: invitationLookupError } = await supabase.rpc('get_invitation_by_token', {
+          token_input: token
+        });
+
+        if (invitationLookupError) {
+          throw invitationLookupError;
+        }
+
+        const invitationRecord = Array.isArray(invitationLookup) ? invitationLookup[0] : invitationLookup;
+
+        if (!invitationRecord) {
+          if (!cancelled) {
+            setInvitationStatus({ processing: false, type: 'failure', message: 'La invitación ya no existe, fue aceptada anteriormente o ha expirado.' });
+          }
+          return;
+        }
+
+        const signedInEmail = user.email ?? user.user_metadata?.email ?? '';
+        if (invitationRecord.email && signedInEmail && invitationRecord.email.toLowerCase() !== signedInEmail.toLowerCase()) {
+          if (!cancelled) {
+            setInvitationStatus({ processing: false, type: 'failure', message: `Has iniciado sesión con ${signedInEmail}, pero la invitación está dirigida a ${invitationRecord.email}.` });
+          }
+          return;
+        }
+
+        if (invitationRecord.invitation_type === 'project') {
+          const { data: projectResponse, error: projectError } = await supabase.rpc('accept_project_invitation_by_token', {
+            token_input: token
+          });
+
+          if (projectError) {
+            throw projectError;
+          }
+
+          if (!projectResponse?.success) {
+            throw new Error(projectResponse?.error || 'No se pudo aceptar la invitación al tablero.');
+          }
+
+          if (cancelled) return;
+          if (projectResponse.project_id) {
+            setSelectedProjectId(projectResponse.project_id);
+            setActivePrimaryView('dashboard');
+            setActiveManagementTab('tableros');
+          }
+          setInvitationStatus({ processing: false, type: 'success', message: 'Te has unido al tablero correctamente.' });
+          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash || ''}`);
+          return;
+        }
+
+        const { data: workspaceResponse, error: workspaceError } = await supabase.rpc('accept_invitation_by_token', {
+          token_input: token
+        });
+
+        if (workspaceError) {
+          throw workspaceError;
+        }
+
+        if (!workspaceResponse?.success) {
+          throw new Error(workspaceResponse?.error || 'No se pudo aceptar la invitación al workspace.');
+        }
+
+        if (!cancelled) {
+          setInvitationStatus({ processing: false, type: 'success', message: 'Te has unido al workspace correctamente.' });
+          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash || ''}`);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setInvitationStatus({ processing: false, type: 'failure', message: err.message || 'No se pudo aceptar la invitación.' });
+        }
+      }
+    };
+
+    void acceptInvitation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationStatus.processing, invitationStatus.type, user]);
 
   useEffect(() => {
     // Atajos de teclado globales (Ctrl+G para nueva tarea rápida, Ctrl+V para cambiar vista).
@@ -493,6 +604,47 @@ function App() {
     void loadProjectStats();
   }, [selectedProjectId]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadNotificationsCount(0);
+      return undefined;
+    }
+
+    const loadUnreadNotificationsCount = async () => {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (!error) {
+        setUnreadNotificationsCount(count ?? 0);
+      }
+    };
+
+    void loadUnreadNotificationsCount();
+
+    const channel = supabase
+      .channel(`app-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          void loadUnreadNotificationsCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
 
   const handleProjectSelect = useCallback((projectId) => {
     setSelectedProjectId(projectId);
@@ -501,15 +653,28 @@ function App() {
     }
   }, []);
 
+  const handleUnreadNotificationsCountChange = useCallback((count) => {
+    setUnreadNotificationsCount(count);
+  }, []);
+
   const handleProjectsChange = useCallback((projectList) => {
-    setProjects(projectList);
+    setProjects((currentProjects) => {
+      const currentSignature = JSON.stringify((currentProjects ?? []).map((project) => ({ id: project.id, name: project.name, workspace_id: project.workspace_id })));
+      const nextSignature = JSON.stringify((projectList ?? []).map((project) => ({ id: project.id, name: project.name, workspace_id: project.workspace_id })));
+      return currentSignature === nextSignature ? currentProjects : projectList;
+    });
+
     if (projectList.length === 0) {
-      setSelectedProjectId(null);
+      setSelectedProjectId((currentSelectedProjectId) => (currentSelectedProjectId === null ? currentSelectedProjectId : null));
     }
   }, []);
 
   const handleProjectMembersChange = useCallback((memberMap) => {
-    setProjectMembers(memberMap);
+    setProjectMembers((currentMemberMap) => {
+      const currentSignature = JSON.stringify(currentMemberMap ?? {});
+      const nextSignature = JSON.stringify(memberMap ?? {});
+      return currentSignature === nextSignature ? currentMemberMap : memberMap;
+    });
   }, []);
 
   useEffect(() => {
@@ -602,8 +767,6 @@ function App() {
     return <WelcomeSplashScreen theme={layoutTheme} onComplete={handleSplashComplete} />;
   }
 
-  // Invitation acceptance removed
-
   if (!user || requiresMFA) {
     return (
       <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-sky-900 to-indigo-900 px-4 text-slate-50">
@@ -614,6 +777,11 @@ function App() {
         </div>
 
         <div className="relative z-10 w-full max-w-lg">
+          {invitationStatus.message ? (
+            <Alert color={invitationStatus.type === 'failure' ? 'failure' : invitationStatus.type === 'success' ? 'success' : 'info'} className="mb-4">
+              {invitationStatus.message}
+            </Alert>
+          ) : null}
           <AuthForm />
         </div>
       </div>
@@ -678,6 +846,7 @@ function App() {
         label: 'Notificaciones',
         description: 'Menciones y actividad reciente',
         active: activePrimaryView === 'notifications',
+        badge: unreadNotificationsCount > 0 ? `${unreadNotificationsCount}` : undefined,
         icon: navIcons.notifications,
         onClick: () => setActivePrimaryView('notifications')
       },
@@ -823,6 +992,7 @@ function App() {
         )}
         <WorkspacePeopleDashboard
           workspaceId={statsWorkspaceId ?? selectedWorkspaceId}
+          projectId={selectedProjectId}
           workspaceMembers={workspaceMembers}
           onPersonClick={(personId) => {
             setActivePrimaryView('dashboard');
@@ -849,7 +1019,11 @@ function App() {
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Centro de notificaciones</p>
           <p className="text-xs text-slate-500">Revisa tus menciones y alertas del workspace.</p>
         </div>
-        <NotificationPanel userId={user?.id ?? null} workspaceId={selectedWorkspaceId} />
+        <NotificationPanel
+          userId={user?.id ?? null}
+          workspaceId={selectedWorkspaceId}
+          onUnreadCountChange={handleUnreadNotificationsCountChange}
+        />
       </div>
     </Card>
   );
@@ -892,6 +1066,14 @@ function App() {
             setSelectedProjectId={setSelectedProjectId}
             setActiveManagementTab={setActiveManagementTab}
             setActivePrimaryView={setActivePrimaryView}
+            onTaskClick={(task) => {
+              setSelectedProjectId(task.project_id);
+              setActivePrimaryView('dashboard');
+              setActiveManagementTab('tableros');
+              setAssigneePreset('all');
+              setInitialTaskId(task.id);
+              setTimeout(() => setInitialTaskId(null), 500);
+            }}
             pendingAction={pendingAction}
             onClearPendingAction={() => setPendingAction(null)}
           />
@@ -901,32 +1083,44 @@ function App() {
           : profileSection;
 
   return (
-    <AppLayout
-      heading="Taskboard"
-      actions={layoutActions}
-      breadcrumbs={breadcrumbs}
-      statusItems={statusItems}
-      theme={layoutTheme}
-      navigationItems={navigationItems}
-      sidebarActions={sidebarActions}
-      sidebarFooter={sidebarFooter}
-    >
-      {user ? authenticatedContent : unauthenticatedContent}
-      <QuickSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        selectedWorkspaceId={selectedWorkspaceId}
-        onSelectTask={(task) => {
-          setSelectedProjectId(task.project_id);
-          setActivePrimaryView('dashboard');
-          setActiveManagementTab('tableros');
-          setAssigneePreset('all');
-          setInitialTaskId(task.id);
-          setTimeout(() => setInitialTaskId(null), 500);
-        }}
-      />
-      <CookieConsent />
-    </AppLayout>
+    <>
+      {invitationStatus.message && user ? (
+        <div className="fixed right-4 top-4 z-50 max-w-md">
+          <Alert color={invitationStatus.type === 'failure' ? 'failure' : invitationStatus.type === 'success' ? 'success' : 'info'}>
+            <div className="flex items-center gap-2">
+              {invitationStatus.processing ? <Spinner size="sm" /> : null}
+              <span>{invitationStatus.message}</span>
+            </div>
+          </Alert>
+        </div>
+      ) : null}
+      <AppLayout
+        heading="Taskboard"
+        actions={layoutActions}
+        breadcrumbs={breadcrumbs}
+        statusItems={statusItems}
+        theme={layoutTheme}
+        navigationItems={navigationItems}
+        sidebarActions={sidebarActions}
+        sidebarFooter={sidebarFooter}
+      >
+        {user ? authenticatedContent : unauthenticatedContent}
+        <QuickSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          selectedWorkspaceId={selectedWorkspaceId}
+          onSelectTask={(task) => {
+            setSelectedProjectId(task.project_id);
+            setActivePrimaryView('dashboard');
+            setActiveManagementTab('tableros');
+            setAssigneePreset('all');
+            setInitialTaskId(task.id);
+            setTimeout(() => setInitialTaskId(null), 500);
+          }}
+        />
+        <CookieConsent />
+      </AppLayout>
+    </>
   );
 }
 

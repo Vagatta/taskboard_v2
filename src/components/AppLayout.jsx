@@ -101,6 +101,9 @@ export default function AppLayout({
           'rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400';
         const activeClasses = 'border-cyan-400/40 bg-cyan-500/10 text-cyan-700 dark:text-white shadow-lg shadow-cyan-500/10';
         const idleClasses = 'border-transparent text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white';
+        const badgeClasses = item.badge
+          ? 'rounded-full bg-cyan-100/80 dark:bg-cyan-900/30 px-2 text-xs font-medium text-cyan-700 dark:text-cyan-200'
+          : 'rounded-full bg-slate-200 dark:bg-slate-900/60 px-2 text-xs text-slate-600 dark:text-slate-300';
         return (
           <button
             key={item.id}
@@ -115,7 +118,7 @@ export default function AppLayout({
                 <span className="text-sm font-semibold tracking-wide">{item.label}</span>
               </div>
               {item.badge ? (
-                <span className="rounded-full bg-slate-200 dark:bg-slate-900/60 px-2 text-xs text-slate-600 dark:text-slate-300">{item.badge}</span>
+                <span className={badgeClasses}>{item.badge}</span>
               ) : null}
             </div>
             {item.description ? <p className="text-xs text-slate-500 dark:text-slate-500">{item.description}</p> : null}

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Card, Spinner, TextInput } from 'flowbite-react';
+import { Badge, Button, Spinner, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
-import { formatRelativeTime } from '../utils/dateHelpers';
 
 const COLUMN_COLORS = [
   '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'

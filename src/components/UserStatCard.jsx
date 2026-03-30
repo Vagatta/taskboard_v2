@@ -11,12 +11,12 @@ export default function UserStatCard({ title, value, description, icon, color = 
   return (
     <div className={`flex flex-col gap-2 rounded-2xl border p-4 transition-all hover:scale-[1.02] hover:shadow-lg ${schema} backdrop-blur-sm`}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{title}</span>
-        {icon && <div className="opacity-70">{icon}</div>}
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">{title}</span>
+        {icon && <div className="text-current">{icon}</div>}
       </div>
       <div>
         <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{value}</p>
-        {description && <p className="text-xs font-medium opacity-60">{description}</p>}
+        {description && <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{description}</p>}
       </div>
     </div>
   );

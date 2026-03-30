@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Alert, Badge, Button, Card, Checkbox, Select, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 import TaskComments from './TaskComments';
@@ -340,9 +341,9 @@ export default function TaskDetailPanel({
     }
   };
 
-  return (
+  const panelContent = (
     <div className={isFocusMode ? 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md animate-in fade-in duration-300' : 'contents'}>
-      <Card className={`flex h-full flex-col gap-4 border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 transition-all duration-300 ${isFocusMode ? 'w-full max-w-6xl shadow-2xl shadow-cyan-500/10' : ''}`}>
+      <Card className={`flex h-full flex-col gap-4 border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/10 transition-all duration-300 ${isFocusMode ? 'max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-auto shadow-2xl shadow-cyan-500/10' : ''}`}>
         <TaskHeader
           task={task}
           statusMeta={statusMeta}
@@ -688,6 +689,35 @@ export default function TaskDetailPanel({
       </Card>
     </div>
   );
+
+  return isFocusMode ? createPortal(panelContent, document.body) : panelContent;
+}
+
+function TaskSolicitudItem({ item, index }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldCollapse = typeof item.value === 'string' && item.value.length > 220;
+
+  return (
+    <div key={`${item.label}-${index}`} className="rounded-lg bg-slate-100/70 dark:bg-slate-900/40 p-3">
+      {item.label ? (
+        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</dt>
+      ) : null}
+      <dd
+        className={`mt-1 break-words text-[15px] leading-6 ${!shouldCollapse || isExpanded ? '' : 'max-h-28 overflow-y-auto pr-2'}`}
+      >
+        {item.value}
+      </dd>
+      {shouldCollapse ? (
+        <button
+          type="button"
+          className="mt-2 text-xs font-medium text-cyan-600 transition hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300"
+          onClick={() => setIsExpanded((current) => !current)}
+        >
+          {isExpanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function TaskSolicitudSection({ details = [] }) {
@@ -703,14 +733,7 @@ function TaskSolicitudSection({ details = [] }) {
       </header>
       <dl className="grid gap-3 text-sm text-slate-700 dark:text-slate-200 sm:grid-cols-2">
         {details.map((item, index) => (
-          <div key={`${item.label}-${index}`} className="rounded-lg bg-slate-100/70 dark:bg-slate-900/40 p-3">
-            {item.label ? (
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</dt>
-            ) : null}
-            <dd className="mt-0.5 break-words text-sm">
-              {item.value}
-            </dd>
-          </div>
+          <TaskSolicitudItem key={`${item.label}-${index}`} item={item} index={index} />
         ))}
       </dl>
     </section>

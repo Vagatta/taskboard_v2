@@ -31,11 +31,11 @@ const Icons = {
 
 function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
     const colorClasses = {
-        blue: 'from-blue-500/20 to-cyan-500/20 text-blue-400 border-blue-500/30',
-        indigo: 'from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30',
-        emerald: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
-        amber: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30',
-        rose: 'from-rose-500/20 to-pink-500/20 text-rose-400 border-rose-500/30',
+        blue: 'from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30',
+        indigo: 'from-indigo-500/20 to-purple-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+        emerald: 'from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+        amber: 'from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30',
+        rose: 'from-rose-500/20 to-pink-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30',
     };
 
     const bgGlow = {
@@ -52,11 +52,11 @@ function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
 
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{title}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">{title}</p>
                     <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{value}</p>
-                    <p className="mt-1 text-xs font-medium opacity-60 line-clamp-1">{subtitle}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400 line-clamp-1">{subtitle}</p>
                 </div>
-                <div className={`rounded-xl bg-white/10 dark:bg-slate-800/50 p-3 shadow-inner transition-transform group-hover:scale-110`}>
+                <div className={`rounded-xl bg-white/60 dark:bg-slate-800/50 p-3 shadow-inner transition-transform group-hover:scale-110`}>
                     {icon}
                 </div>
             </div>
@@ -169,26 +169,26 @@ export default function StatsDashboard({
                     <div className="grid gap-6 sm:grid-cols-3">
                         <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 shadow-inner">
                             <span className="text-2xl font-bold text-slate-900 dark:text-white">{taskSummary.total}</span>
-                            <span className="text-[10px] font-bold uppercase text-slate-500">Total</span>
+                            <span className="text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400">Total</span>
                         </div>
                         <div className="flex flex-col items-center justify-center rounded-2xl bg-amber-500/5 p-4 border border-amber-500/20 shadow-inner">
-                            <span className="text-2xl font-bold text-amber-500">{taskSummary.pending}</span>
-                            <span className="text-[10px] font-bold uppercase text-amber-500/70 tracking-tighter">Pendientes</span>
+                            <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{taskSummary.pending}</span>
+                            <span className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300 tracking-tighter">Pendientes</span>
                         </div>
                         <div className="flex flex-col items-center justify-center rounded-2xl bg-emerald-500/5 p-4 border border-emerald-500/20 shadow-inner">
-                            <span className="text-2xl font-bold text-emerald-500">{taskSummary.completed}</span>
-                            <span className="text-[10px] font-bold uppercase text-emerald-500/70">Finalizadas</span>
+                            <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{taskSummary.completed}</span>
+                            <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Finalizadas</span>
                         </div>
                     </div>
 
                     <div className="mt-8 space-y-4">
-                        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <span>Rendimiento vs Plazos</span>
                             <div className="flex gap-4">
-                                <span className="flex items-center gap-1.5 text-emerald-500">
+                                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
                                     <span className="h-2 w-2 rounded-full bg-emerald-500" /> En plazo: {taskSummary.completedOnTime}
                                 </span>
-                                <span className="flex items-center gap-1.5 text-rose-500">
+                                <span className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
                                     <span className="h-2 w-2 rounded-full bg-rose-500" /> Retraso: {taskSummary.completedLate}
                                 </span>
                             </div>

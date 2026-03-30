@@ -256,3 +256,175 @@
     pointer-events: none;
   }
 }
+
+.task-complete-toggle {
+  transition: transform 180ms ease, box-shadow 220ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.task-complete-toggle:hover {
+  transform: scale(1.08);
+}
+
+.task-complete-toggle.is-completed {
+  animation: task-complete-bounce 320ms ease;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
+}
+
+.task-complete-surface {
+  transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease, border-color 220ms ease;
+  transform-origin: center;
+}
+
+.task-complete-surface.is-completed {
+  animation: task-complete-pop 300ms ease;
+}
+
+.task-open-highlight {
+  animation: task-open-highlight-flash 1.8s ease;
+}
+
+@keyframes task-complete-bounce {
+  0% {
+    transform: scale(0.92);
+  }
+
+  50% {
+    transform: scale(1.16);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes task-open-highlight-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    background-color: rgba(34, 211, 238, 0);
+  }
+
+  35% {
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.18);
+    background-color: rgba(34, 211, 238, 0.08);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    background-color: rgba(34, 211, 238, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-complete-toggle,
+  .task-complete-surface,
+  .task-complete-toggle.is-completed,
+  .task-complete-surface.is-completed,
+  .task-confetti-piece,
+  .task-open-highlight {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .task-confetti {
+    display: none;
+  }
+}
+
+.task-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.task-confetti-piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 10px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: task-confetti-burst 850ms ease-out forwards;
+  z-index: 31;
+}
+
+.task-confetti-piece.piece-1 {
+  background: #22c55e;
+  animation-delay: 0ms;
+  --tx: -34px;
+  --ty: -42px;
+  --rot: -38deg;
+}
+
+.task-confetti-piece.piece-2 {
+  background: #06b6d4;
+  animation-delay: 40ms;
+  --tx: -10px;
+  --ty: -52px;
+  --rot: 24deg;
+}
+
+.task-confetti-piece.piece-3 {
+  background: #f59e0b;
+  animation-delay: 20ms;
+  --tx: 20px;
+  --ty: -46px;
+  --rot: 52deg;
+}
+
+.task-confetti-piece.piece-4 {
+  background: #a855f7;
+  animation-delay: 60ms;
+  --tx: 36px;
+  --ty: -28px;
+  --rot: -14deg;
+}
+
+.task-confetti-piece.piece-5 {
+  background: #ef4444;
+  animation-delay: 30ms;
+  --tx: -26px;
+  --ty: -18px;
+  --rot: 64deg;
+}
+
+.task-confetti-piece.piece-6 {
+  background: #3b82f6;
+  animation-delay: 70ms;
+  --tx: 12px;
+  --ty: -20px;
+  --rot: -56deg;
+}
+
+@keyframes task-confetti-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(var(--rot));
+  }
+}
+
+@keyframes task-complete-pop {
+  0% {
+    transform: scale(0.985);
+  }
+
+  50% {
+    transform: scale(1.01);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

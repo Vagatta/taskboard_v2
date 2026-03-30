@@ -107,7 +107,7 @@ export default function JotformImporter({ projectId, userId, userEmail, onImport
         const task = tasks[i];
         
         try {
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('tasks')
             .insert([task])
             .select()

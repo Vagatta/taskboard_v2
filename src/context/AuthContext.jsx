@@ -36,6 +36,54 @@ export function AuthProvider({ children }) {
     return false;
   }, []);
 
+  // Función centralizada para enviar el código MFA
+  const sendMFACode = useCallback(async (mfaUser, email) => {
+    if (!mfaUser || !email) return;
+
+    setAuthLoading(true);
+    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const displayName = mfaUser.user_metadata?.full_name || email.split('@')[0];
+
+    try {
+      console.log('[AuthContext] Preparando envío de código MFA a:', email);
+      const { data, error: mfaError } = await supabase.functions.invoke('send-mfa-code', {
+        body: {
+          email: email,
+          code: randomCode,
+          name: displayName
+        }
+      });
+
+      console.log('[AuthContext] Respuesta de send-mfa-code:', { data, error: mfaError });
+
+      if (mfaError) throw mfaError;
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Error desconocido en la entrega del código');
+      }
+
+      // Guardar en sessionStorage para sobrevivir a refrescos
+      sessionStorage.setItem('mfa_generated_code', randomCode);
+      sessionStorage.setItem('mfa_last_sent_timestamp', Date.now().toString());
+
+      setState((prev) => ({
+        ...prev,
+        requiresMFA: true,
+        mfaUser: mfaUser,
+        generatedCode: randomCode,
+        user: null,
+        successMessage: `✓ Se ha enviado un nuevo código de seguridad a ${email}`
+      }));
+      return true;
+    } catch (err) {
+      console.error('[AuthContext] Error enviando MFA:', err);
+      const message = err.message || 'No se pudo enviar el código de seguridad. Verifica tu conexión o contacta a soporte.';
+      setState((prev) => ({ ...prev, error: message }));
+      return false;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -123,7 +171,7 @@ export function AuthProvider({ children }) {
 
         // SOLO enviar automáticamente en SIGNED_IN (nuevo login)
         // En INITIAL_SESSION (F5) simplemente mostramos la pantalla de MFA reusando el código anterior
-        if (event === 'SIGNED_IN' && !state.authLoading && !inCooldown) {
+        if (event === 'SIGNED_IN' && !authLoading && !inCooldown) {
           console.log('[AuthDebug] Activando envío automático de MFA por nuevo SIGNED_IN');
           sessionStorage.setItem('mfa_last_sent_timestamp', Date.now().toString());
           lastMfaEmailSentRef.current = { userId: user.id, timestamp: Date.now() };
@@ -166,56 +214,7 @@ export function AuthProvider({ children }) {
       isMounted = false;
       listener?.subscription?.unsubscribe();
     };
-  }, []);
-
-  // Función centralizada para enviar el código MFA
-  const sendMFACode = useCallback(async (mfaUser, email) => {
-    if (!mfaUser || !email) return;
-
-    setAuthLoading(true);
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const displayName = mfaUser.user_metadata?.full_name || email.split('@')[0];
-
-    try {
-      console.log('[AuthContext] Preparando envío de código MFA a:', email);
-      const { data, error: mfaError } = await supabase.functions.invoke('send-mfa-code', {
-        body: {
-          email: email,
-          code: randomCode,
-          name: displayName
-        }
-      });
-
-      console.log('[AuthContext] Respuesta de send-mfa-code:', { data, error: mfaError });
-
-      if (mfaError) throw mfaError;
-      if (data && data.success === false) {
-        throw new Error(data.error || 'Error desconocido en la entrega del código');
-      }
-
-      // Guardar en sessionStorage para sobrevivir a refrescos
-      sessionStorage.setItem('mfa_generated_code', randomCode);
-      sessionStorage.setItem('mfa_last_sent_timestamp', Date.now().toString());
-
-      setState((prev) => ({
-        ...prev,
-        requiresMFA: true,
-        mfaUser: mfaUser,
-        generatedCode: randomCode,
-        user: null,
-        successMessage: `✓ Se ha enviado un nuevo código de seguridad a ${email}`
-      }));
-      return true;
-    } catch (err) {
-      console.error('[AuthContext] Error enviando MFA:', err);
-      // Usamos el mensaje real del error para diagnóstico final
-      const message = err.message || 'No se pudo enviar el código de seguridad. Verifica tu conexión o contacta a soporte.';
-      setState((prev) => ({ ...prev, error: message }));
-      return false;
-    } finally {
-      setAuthLoading(false);
-    }
-  }, []);
+  }, [authLoading, checkIsTrusted, sendMFACode]);
 
   const resendMFACode = useCallback(async () => {
     if (state.mfaUser && (state.mfaUser.email || state.mfaUser.user_metadata?.email)) {

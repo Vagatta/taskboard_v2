@@ -38,7 +38,7 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
-export default function NotificationPanel({ userId, workspaceId }) {
+export default function NotificationPanel({ userId, workspaceId, onUnreadCountChange }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -120,6 +120,10 @@ export default function NotificationPanel({ userId, workspaceId }) {
   }, [loadNotifications]);
 
   useEffect(() => {
+    onUnreadCountChange?.(groupedNotifications.unread.length);
+  }, [groupedNotifications.unread.length, onUnreadCountChange]);
+
+  useEffect(() => {
     if (!userId) {
       return undefined;
     }
@@ -129,14 +133,26 @@ export default function NotificationPanel({ userId, workspaceId }) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${userId}`
         },
         (payload) => {
-          setNotifications((prev) => [payload.new, ...prev].slice(0, 30));
-          setToastQueue((prev) => [...prev, payload.new]);
+          if (payload.eventType === 'INSERT') {
+            setNotifications((prev) => [payload.new, ...prev].slice(0, 30));
+            setToastQueue((prev) => [...prev, payload.new]);
+            return;
+          }
+
+          if (payload.eventType === 'UPDATE') {
+            setNotifications((prev) => prev.map((item) => (item.id === payload.new.id ? { ...item, ...payload.new } : item)));
+            return;
+          }
+
+          if (payload.eventType === 'DELETE') {
+            setNotifications((prev) => prev.filter((item) => item.id !== payload.old.id));
+          }
         }
       )
       .subscribe();

@@ -21,8 +21,12 @@ BEGIN
         RETURN json_build_object('success', false, 'error', 'No autenticado');
     END IF;
 
-    -- Obtener email del usuario actual desde la tabla profiles
-    SELECT email INTO user_email FROM profiles WHERE id = current_user_id;
+    -- Obtener email del usuario actual desde el JWT y fallback a profiles
+    user_email := auth.jwt() ->> 'email';
+
+    IF user_email IS NULL THEN
+        SELECT email INTO user_email FROM profiles WHERE id = current_user_id;
+    END IF;
 
     -- Buscar la invitación válida
     SELECT * INTO invitation_record 
@@ -40,6 +44,11 @@ BEGIN
     IF invitation_record.email <> user_email THEN
         RETURN json_build_object('success', false, 'error', 'El email del usuario no coincide con la invitación');
     END IF;
+
+    INSERT INTO profiles (id, email)
+    VALUES (current_user_id, user_email)
+    ON CONFLICT (id) DO UPDATE
+    SET email = COALESCE(profiles.email, EXCLUDED.email);
 
     -- Insertar en workspace_members si no existe
     INSERT INTO workspace_members (workspace_id, user_id, role)

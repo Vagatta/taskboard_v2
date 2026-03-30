@@ -61,37 +61,68 @@ export function humanizeEventType(eventType) {
 export function calculateStreak(completedDates) {
   if (!Array.isArray(completedDates) || completedDates.length === 0) return 0;
 
-  // Normalizar fechas a YYYY-MM-DD y descartar duplicados
+  const normalizeDate = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+
+  const toDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
+
+  const getPreviousWorkingDay = (date) => {
+    const previous = new Date(date);
+    previous.setDate(previous.getDate() - 1);
+
+    while (isWeekend(previous)) {
+      previous.setDate(previous.getDate() - 1);
+    }
+
+    return previous;
+  };
+
   const uniqueDates = [...new Set(
     completedDates
-      .map(d => new Date(d))
-      .filter(d => !isNaN(d.getTime()))
-      .map(d => d.toISOString().split('T')[0])
+      .map((value) => normalizeDate(value))
+      .filter(Boolean)
+      .map((date) => toDateKey(date))
   )].sort().reverse();
 
   if (uniqueDates.length === 0) return 0;
 
-  let streak = 0;
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const latestActivity = normalizeDate(uniqueDates[0]);
+  const today = normalizeDate(new Date());
+  const referenceDate = isWeekend(today) ? getPreviousWorkingDay(today) : today;
+  const previousWorkingDay = getPreviousWorkingDay(referenceDate);
+  const latestActivityKey = toDateKey(latestActivity);
 
-  // Si la última actividad fue hace más de un día, la racha es 0
-  if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
+  if (latestActivityKey !== toDateKey(referenceDate) && latestActivityKey !== toDateKey(previousWorkingDay)) {
     return 0;
   }
 
-  let checkDate = new Date(uniqueDates[0]);
+  let streak = 0;
+  let expectedDate = latestActivity;
+
   for (let i = 0; i < uniqueDates.length; i++) {
-    const expectedStr = checkDate.toISOString().split('T')[0];
-    if (uniqueDates[i] === expectedStr) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
+    const expectedKey = toDateKey(expectedDate);
+    if (uniqueDates[i] !== expectedKey) {
       break;
     }
+
+    streak++;
+    expectedDate = getPreviousWorkingDay(expectedDate);
   }
 
   return streak;

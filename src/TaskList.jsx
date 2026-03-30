@@ -22,9 +22,8 @@ const TaskList = forwardRef(function TaskList(
   const [newTask, setNewTask] = useState('');
 
 
-  const taskListRef = useRef(null);
   const lastSummaryRef = useRef(null);
-  const lastProjectRef = useRef(null);
+  const detailPanelRef = useRef(null);
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('medium');
   const [newTaskEffort, setNewTaskEffort] = useState('m');
@@ -56,9 +55,11 @@ const TaskList = forwardRef(function TaskList(
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [activeTasksSection, setActiveTasksSection] = useState('tasks');
   const newTaskInputRef = useRef(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [taskCommentMeta, setTaskCommentMeta] = useState({});
   const [taskActivityMeta, setTaskActivityMeta] = useState({});
   const [subtasksByTaskId, setSubtasksByTaskId] = useState({});
@@ -151,6 +152,17 @@ const TaskList = forwardRef(function TaskList(
       const task = tasks.find((t) => t.id === initialTaskId);
       if (task) {
         setSelectedTaskDetail(task);
+        setViewMode('detail');
+        setActiveTasksSection('tasks');
+        setHighlightedTaskId(task.id);
+
+        window.setTimeout(() => {
+          detailPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+
+        window.setTimeout(() => {
+          setHighlightedTaskId((current) => (current === task.id ? null : current));
+        }, 2200);
       }
     }
   }, [initialTaskId, tasks]);
@@ -697,6 +709,35 @@ const TaskList = forwardRef(function TaskList(
     [filteredTasks.length, loading, projectId, totalTasks]
   );
 
+  const tasksPerPage = 5;
+  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / tasksPerPage));
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (currentPage - 1) * tasksPerPage;
+    return sortedTasks.slice(startIndex, startIndex + tasksPerPage);
+  }, [currentPage, sortedTasks]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    assigneeFilter,
+    completedBeforeFilter,
+    createdFromFilter,
+    createdToFilter,
+    dueBeforeFilter,
+    effortFilter,
+    onlyMentionedFilter,
+    priorityFilter,
+    projectId,
+    searchQuery,
+    sortMode,
+    statusFilter,
+    tagFilter
+  ]);
+
+  useEffect(() => {
+    setCurrentPage((previous) => Math.min(previous, totalPages));
+  }, [totalPages]);
+
   const recalcSubtaskStats = useCallback((taskId, list) => {
     setSubtaskMeta((previous) => ({
       ...previous,
@@ -904,79 +945,6 @@ const TaskList = forwardRef(function TaskList(
     },
     [userId, recalcSubtaskStats]
   );
-
-  const handleAutoPrioritize = useCallback(async () => {
-    const pendingTasks = tasks.filter(t => !t.completed);
-    if (!projectId || !userId || pendingTasks.length === 0) {
-      setErrorMessage('No hay tareas pendientes para organizar.');
-      return;
-    }
-
-    const confirmed = window.confirm('Esto pedirá a la IA que reorganice las prioridades de tus tareas pendientes. ¿Deseas continuar?');
-    if (!confirmed) return;
-
-    setAddingTask(true);
-    setErrorMessage('');
-
-    try {
-      const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
-      if (!API_KEY) throw new Error('Falta la API Key de Gemini en el archivo .env');
-
-      const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${API_KEY}`;
-
-      const tasksSummary = pendingTasks.map(t => ({
-        id: t.id,
-        title: t.title,
-        priority: t.priority,
-        due_date: t.due_date,
-        effort: t.effort
-      }));
-
-      const prompt = `
-        Actúa como un experto gestor de tableros. Analiza las siguientes tareas pendientes y asígnales una prioridad ("high", "medium" o "low") optimizada para maximizar la productividad, considerando sus títulos y fechas de entrega (si las tienen).
-        Tareas: ${JSON.stringify(tasksSummary)}
-
-        Devuelve ÚNICAMENTE un array JSON de objetos con este formato: [{"id": "uuid-de-la-tarea", "priority": "high|medium|low"}].
-        No añadas texto antes ni después del JSON.
-      `;
-
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || 'Error comunicando con Gemini AI');
-      }
-
-      const data = await response.json();
-      const rawText = data.candidates[0].content.parts[0].text;
-      const cleanedText = rawText.replace(/```json|```/g, '').trim();
-      const newPriorities = JSON.parse(cleanedText);
-
-      if (!Array.isArray(newPriorities)) throw new Error('La IA devolvió un formato inválido.');
-
-      // Actualizar una por una para asegurar cumplimiento de RLS y triggers
-      const updates = newPriorities.map(item =>
-        supabase
-          .from('tasks')
-          .update({ priority: item.priority, updated_by: userId })
-          .eq('id', item.id)
-          .eq('project_id', projectId)
-      );
-
-      await Promise.all(updates);
-      await loadTasks();
-
-    } catch (err) {
-      console.error(err);
-      setErrorMessage(err.message || 'Error al intentar priorizar tareas con IA.');
-    } finally {
-      setAddingTask(false);
-    }
-  }, [projectId, userId, tasks, loadTasks]);
 
   const handleToggleSubtask = useCallback(
     async (taskId, subtask) => {
@@ -1417,6 +1385,12 @@ const TaskList = forwardRef(function TaskList(
 
   const deleteTask = useCallback(
     async (taskId) => {
+      const taskToDelete = tasks.find((task) => task.id === taskId);
+      if (taskToDelete?.completed) {
+        setErrorMessage('Las tareas completadas no se pueden eliminar.');
+        return;
+      }
+
       setPendingTaskId(taskId);
 
       const { data, error } = await supabase
@@ -1441,7 +1415,7 @@ const TaskList = forwardRef(function TaskList(
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
       setPendingTaskId(null);
     },
-    [projectId]
+    [projectId, tasks]
   );
 
   const renderListView = useMemo(() => {
@@ -1494,7 +1468,7 @@ const TaskList = forwardRef(function TaskList(
     const pendingVisible = visibleTasks - completedVisible;
     const now = Date.now();
     const hasSelection = selectedTaskIds.length > 0;
-    const allVisibleSelected = hasSelection && selectedTaskIds.length === visibleTasks;
+    const allVisibleSelected = paginatedTasks.length > 0 && paginatedTasks.every((task) => selectedTaskIds.includes(task.id));
 
     return (
       <div className="flex flex-col gap-3">
@@ -1543,7 +1517,7 @@ const TaskList = forwardRef(function TaskList(
 
         {/* Mobile List View */}
         <div className="block sm:hidden space-y-3">
-          {sortedTasks.map((task) => {
+          {paginatedTasks.map((task) => {
             const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
             const assigneeLabel = assigneeMember?.member_email ?? (task.assigned_to ? 'Asignado' : 'Sin asignar');
             const dueDate = task.due_date ? new Date(task.due_date) : null;
@@ -1612,9 +1586,13 @@ const TaskList = forwardRef(function TaskList(
                       onChange={(event) => {
                         const checked = event.target.checked;
                         if (checked) {
-                          setSelectedTaskIds(sortedTasks.map((task) => task.id));
+                          setSelectedTaskIds((previous) => {
+                            const nextIds = new Set(previous);
+                            paginatedTasks.forEach((task) => nextIds.add(task.id));
+                            return Array.from(nextIds);
+                          });
                         } else {
-                          setSelectedTaskIds([]);
+                          setSelectedTaskIds((previous) => previous.filter((id) => !paginatedTasks.some((task) => task.id === id)));
                         }
                       }}
                     />
@@ -1630,7 +1608,7 @@ const TaskList = forwardRef(function TaskList(
                 </tr>
               </thead>
               <tbody>
-                {sortedTasks.map((task) => {
+                {paginatedTasks.map((task) => {
                   const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
                   const statusMeta = task.completed
                     ? { label: 'Completada', color: 'success' }
@@ -1774,10 +1752,26 @@ const TaskList = forwardRef(function TaskList(
               </tbody>
             </table>
           </div>
+          {sortedTasks.length > tasksPerPage ? (
+            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+              <span>
+                Página {currentPage} de {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="xs" color="gray" disabled={currentPage === 1} onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}>
+                  Anterior
+                </Button>
+                <Button size="xs" color="gray" disabled={currentPage === totalPages} onClick={() => setCurrentPage((previous) => Math.min(totalPages, previous + 1))}>
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     );
   }, [
+    currentPage,
     errorMessage,
     filteredTasks,
     isEmpty,
@@ -1786,12 +1780,14 @@ const TaskList = forwardRef(function TaskList(
     handleBulkUpdatePriority,
     loading,
     membersById,
+    paginatedTasks,
     projectId,
     selectedTaskDetail?.id,
     sortedTasks,
     selectedTaskIds,
     subtaskMeta,
     tasks.length,
+    totalPages,
     toggleTaskCompletion
   ]);
 
@@ -2121,7 +2117,7 @@ const TaskList = forwardRef(function TaskList(
         >
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <p className={`text-base font-semibold ${task.completed ? 'text-slate-400 line-through' : 'text-white'}`}>{task.title}</p>
+              <p className={`text-base font-semibold ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{task.title}</p>
               <Button
                 size="xs"
                 color="dark"
@@ -2735,9 +2731,7 @@ const TaskList = forwardRef(function TaskList(
                         </svg>
                       )
                     },
-                    {
 
-                    }
                   ].map((tool) => {
 
                     const isActive = taskToolsTab === tool.id;
@@ -2905,7 +2899,10 @@ const TaskList = forwardRef(function TaskList(
                     {viewMode === 'calendar' && <div className="mt-4">{calendarContent}</div>}
                     {viewMode === 'boards' && <div className="mt-4">{boardsContent}</div>}
                     {viewMode === 'detail' && selectedTaskDetail && (
-                      <div className="mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4 overflow-hidden min-w-0">
+                      <div
+                        ref={detailPanelRef}
+                        className={`mt-4 border-t border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 pt-4 overflow-hidden min-w-0 ${highlightedTaskId === selectedTaskDetail.id ? 'task-open-highlight' : ''}`}
+                      >
                         <TaskDetailPanel
                           task={selectedTaskDetail}
                           membersById={membersById}
@@ -2956,12 +2953,12 @@ const TaskList = forwardRef(function TaskList(
 
       {showCreatePanel ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-950/95 p-4 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/95 p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-white">Nueva tarea</h3>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Nueva tarea</h3>
               <button
                 type="button"
-                className="rounded-full px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                className="rounded-full px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 onClick={() => setShowCreatePanel(false)}
               >
                 ×

@@ -431,7 +431,7 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
             <div className="space-y-4 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/30 dark:bg-slate-900/40 p-6 backdrop-blur-sm">
               <div className="flex flex-col gap-1">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Credenciales Locales</h4>
-                <p className="text-[10px] text-slate-400">Cambia tu contraseña para mantener la cuenta segura.</p>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400">Cambia tu contraseña para mantener la cuenta segura.</p>
               </div>
 
               <div className="grid gap-4">
@@ -553,7 +553,7 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
               color="info"
               type="button"
               onClick={() => handleSavePreference('notifications')}
-              className="w-full rounded-[1.25rem] bg-gradient-to-br from-indigo-600 to-purple-700 px-8 py-1.5 font-bold uppercase tracking-[0.1em] shadow-xl shadow-indigo-500/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-indigo-500/40 active:scale-95"
+              className="w-full rounded-[1.25rem] border border-indigo-300/70 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 px-8 py-1.5 font-bold uppercase tracking-[0.1em] text-white shadow-xl shadow-indigo-500/20 transition-all duration-300 hover:scale-[1.03] hover:shadow-indigo-500/30 hover:from-indigo-500 hover:to-purple-600 active:scale-95 dark:border-indigo-400/20 dark:from-indigo-500 dark:via-indigo-600 dark:to-purple-700 dark:shadow-indigo-950/40"
             >
               <div className="flex items-center gap-2">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>

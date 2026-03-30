@@ -37,8 +37,6 @@ export function mapJotformToTask(jotformRow, projectId, userId, userEmail) {
 
   const tags = buildTags(jotformRow);
 
-  const attachmentURLs = extractURLs(jotformRow['Carga de los archivo necesarios para el correcto trabajo técnico. Incluye al menos una plano, anque sea a mano alzada y/o aproximado con las anotaciones. Tambien si puedes, las tomas mas importantes. Se agradecen imagenes con notas, ideas o gustos del cliente, asi como si es posible un video con la cocina actual. Mejor que sobre y no que falte ;-)']);
-
   return {
     title,
     description,
@@ -232,38 +230,6 @@ function buildTags(row) {
   }
 
   return tags.filter((tag, index, self) => self.indexOf(tag) === index);
-}
-
-/**
- * Extrae especificaciones técnicas
- */
-function extractSpecifications(row) {
-  return {
-    espacios: row['Espacios a diseñar. Marca todas las estancias a tener en cuenta para el proyecto'],
-    uso_vivienda: row['Uso de vivienda del cliente'],
-    medicion_oficial: row['Dispone de medición oficial'],
-    coleccion: row['Colección fabricante'],
-    tirador: row['Tipo de tirador (Gola, Uñero, Push)'],
-    color_tirador: row['Color de Tirador y/o gola'],
-    frente_principal: {
-      modelo: row['Modelo Frente Principal'],
-      color: row['Color de frente']
-    },
-    frente_secundario: {
-      modelo: row['Modelo Frente Secundario'],
-      color: row['Color de frente 2']
-    },
-    altura_techo: row['Altura de Techo'],
-    cierre_techo: row['Cierre a Techo'],
-    altura_armarios: row['Altura de armarios'],
-    encimera: row['Encimera'],
-    datos_encimera: row['Datos de la encimera'],
-    electrodomesticos: row['Definicion de todos los electrodomesticos'],
-    accesorios: row['Accesorios'],
-    preferencia_muebles: row['Preferencia por muebles...'],
-    alternativas_necesarias: row['Alternativas Necesarias'],
-    dias_al_pedido: row['Dias al Pedido']
-  };
 }
 
 /**

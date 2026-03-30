@@ -8,7 +8,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // Dashboard simple para ver tareas por persona dentro del workspace actual.
-export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers = {}, onPersonClick, onTaskClick }) {
+export default function WorkspacePeopleDashboard({ workspaceId, projectId, workspaceMembers = {}, onPersonClick, onTaskClick }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +18,15 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
   const workspaceMemberList = useMemo(() => {
     return workspaceId ? workspaceMembers[workspaceId] ?? [] : [];
   }, [workspaceId, workspaceMembers]);
+
+  // Sincronizar filtro de proyecto con la prop projectId
+  useEffect(() => {
+    if (projectId) {
+      setProjectFilter(String(projectId));
+    } else {
+      setProjectFilter('all');
+    }
+  }, [projectId]);
 
   useEffect(() => {
     const load = async () => {
@@ -220,7 +229,7 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
             size="xs"
             color="info"
             onClick={generateReport}
-            className="bg-sky-500 hover:bg-sky-600 shadow-md w-full sm:w-auto"
+            className="bg-sky-500 hover:bg-sky-600 text-white shadow-md w-full sm:w-auto"
           >
             <div className="flex items-center justify-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,14 +262,27 @@ export default function WorkspacePeopleDashboard({ workspaceId, workspaceMembers
               value={projectFilter}
               onChange={(event) => setProjectFilter(event.target.value)}
               className="flex-1 lg:w-44"
+              disabled={!!projectId}
             >
-              <option value="all">Todos los tableros</option>
+              <option value="all">{projectId ? 'Cargando tablero seleccionado...' : 'Todos los tableros'}</option>
               {projectsForFilter.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
               ))}
             </Select>
+            {projectId && projectFilter !== 'all' && (
+              <Button 
+                size="xs" 
+                color="gray" 
+                pill 
+                onClick={() => setProjectFilter('all')}
+                className="ml-2"
+                title="Ver todos los tableros del workspace"
+              >
+                Ver todo
+              </Button>
+            )}
           </div>
         </div>
       </div>
