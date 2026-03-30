@@ -8,6 +8,12 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+      REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+      REACT_APP_BASE_URL: http://localhost:3000
+      REACT_APP_API_BASE_URL: http://localhost:3000
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
