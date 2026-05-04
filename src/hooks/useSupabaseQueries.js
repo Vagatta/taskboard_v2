@@ -111,7 +111,7 @@ export function useProjectMembers(projectId) {
                 .eq('project_id', projectId);
 
             if (error) {
-                if (error.code === '42P01') return []; // Table doesn't exist yet?
+                if (error.code === '42P01') return []; // Table doesn't exist yet
                 throw error;
             }
 
@@ -124,11 +124,11 @@ export function useProjectMembers(projectId) {
 
 // --- GLOBAL STATS ---
 
-export function useUserGlobalStats(user) {
+export function useUserGlobalStats(user, workspaceId = null) {
     return useQuery({
-        queryKey: ['globalStats', user?.id],
+        queryKey: ['globalStats', user?.id, workspaceId],
         queryFn: async () => {
-            if (!user?.id) return { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 };
+            if (!user?.id) return { workspaces: 0, projects: 0, tasks: 0, completed: 0, pending: 0, dueToday: 0, overdue: 0, collaborators: 0 };
 
             // 1. Conteo de workspaces
             const { count: wsCount } = await supabase
@@ -155,7 +155,49 @@ export function useUserGlobalStats(user) {
                 .eq('assigned_to', user.id)
                 .eq('completed', true);
 
-            // 5. Colaboradores únicos
+            // 5. Tareas pendientes (null o false)
+            const { count: pendingCount } = await supabase
+                .from('tasks')
+                .select('*', { count: 'exact', head: true })
+                .eq('assigned_to', user.id)
+                .or('completed.is.null,completed.eq.false');
+
+            // 6. Críticas: Hoy y Vencidas (Solo si hay workspace)
+            let dueToday = 0;
+            let overdue = 0;
+            // Usamos en-CA para obtener YYYY-MM-DD de forma segura en la zona horaria local
+            const todayStr = new Date().toLocaleDateString('en-CA');
+
+            // 6.1 Mis tareas (Cualquier proyecto o sin proyecto)
+            const { data: myRelevantTasks } = await supabase
+                .from('tasks')
+                .select('due_date')
+                .eq('assigned_to', user.id)
+                .or('completed.is.null,completed.eq.false')
+                .lte('due_date', todayStr);
+
+            // 6.2 Sin asignar (Solo si hay workspace)
+            let unassignedRelevantTasks = [];
+            if (workspaceId) {
+                const { data: workspaceUnassigned } = await supabase
+                    .from('tasks')
+                    .select('due_date, projects!inner(workspace_id)')
+                    .eq('projects.workspace_id', workspaceId)
+                    .is('assigned_to', null)
+                    .or('completed.is.null,completed.eq.false')
+                    .lte('due_date', todayStr);
+                unassignedRelevantTasks = workspaceUnassigned ?? [];
+            }
+
+            const allRelevant = [
+                ...(myRelevantTasks ?? []),
+                ...unassignedRelevantTasks
+            ];
+
+            dueToday = allRelevant.filter(t => t.due_date === todayStr).length;
+            overdue = allRelevant.filter(t => t.due_date < todayStr).length;
+
+            // 7. Colaboradores únicos
             let collaboratorsCount = 0;
             const { data: myProjects } = await supabase
                 .from('project_members')
@@ -169,7 +211,7 @@ export function useUserGlobalStats(user) {
                     .select('member_id')
                     .in('project_id', projectIds);
                 const uniqueIds = new Set(collabData?.map(c => c.member_id));
-                collaboratorsCount = Math.max(0, uniqueIds.size - 1); // Restamos al usuario mismo
+                collaboratorsCount = Math.max(0, uniqueIds.size - 1);
             }
 
             return {
@@ -177,10 +219,47 @@ export function useUserGlobalStats(user) {
                 projects: prjCount ?? 0,
                 tasks: taskCount ?? 0,
                 completed: completedCount ?? 0,
+                pending: pendingCount ?? 0,
+                dueToday: dueToday,
+                overdue: overdue,
                 collaborators: collaboratorsCount
             };
         },
         enabled: !!user?.id,
         staleTime: 1000 * 60 * 5, // 5 minutos
+    });
+}
+
+// --- PROJECT TASK COUNTS ---
+
+export function useProjectTaskCounts(workspaceId) {
+    return useQuery({
+        queryKey: ['projectTaskCounts', workspaceId],
+        queryFn: async () => {
+            if (!workspaceId) return {};
+
+            // Obtenemos todas las tareas pendientes de los proyectos de este workspace
+            // Usamos inner join con projects para filtrar por workspace_id
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('project_id, projects!inner(workspace_id)')
+                .eq('projects.workspace_id', workspaceId)
+                .or('completed.is.null,completed.eq.false');
+
+            if (error) {
+                console.error('Error fetching project task counts:', error);
+                return {};
+            }
+
+            const counts = {};
+            data.forEach((task) => {
+                const pid = task.project_id;
+                counts[pid] = (counts[pid] || 0) + 1;
+            });
+
+            return counts;
+        },
+        enabled: !!workspaceId,
+        staleTime: 1000 * 60 * 2, // 2 minutos
     });
 }

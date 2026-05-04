@@ -60,6 +60,13 @@ export default function TaskDetailPanel({
     setEpicValue(task.epic ?? '');
   }, [task]);
 
+  // Auto-enable assignee editing when task has no assignee
+  useEffect(() => {
+    if (task && !task.assigned_to) {
+      setAssigneeEditing(true);
+    }
+  }, [task]);
+
   useEffect(() => {
     if (!task?.id || !currentUserId) {
       setViewers([]);

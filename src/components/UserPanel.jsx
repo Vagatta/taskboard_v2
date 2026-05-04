@@ -868,51 +868,6 @@ export default function UserPanel({ user, onSignOut, authLoading, stats = { proj
           </div>
         </section>
 
-        <section className="space-y-4 rounded-3xl border border-primary/20 bg-primary/5 p-6 shadow-inner shadow-primary/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary-600">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              </div>
-              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-300">Novedades exclusivas</h2>
-            </div>
-            <Badge color="info" className="rounded-full px-3 animate-bounce">TOP</Badge>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              { title: 'IA Sugerencias', desc: 'Basado en historial', icon: '🤖' },
-              { title: 'Automatización', desc: 'Tareas recurrentes', icon: '⚡' },
-              { title: 'Panel Público', desc: 'Enlaces externos', icon: '🌐' }
-            ].map((item, idx) => (
-              <div key={idx} className="group relative flex flex-col gap-2 rounded-2xl border border-white/50 dark:border-slate-700 bg-white/40 dark:bg-slate-900/40 p-3 transition hover:bg-white/80 dark:hover:bg-slate-800">
-                <span className="text-xl">{item.icon}</span>
-                <p className="text-xs font-bold text-slate-800 dark:text-white">{item.title}</p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          <Button
-            color="info"
-            className="w-full rounded-[1.25rem] bg-gradient-to-br from-primary-600 to-indigo-700 px-8 py-1.5 font-bold uppercase tracking-[0.1em] shadow-xl shadow-primary/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-primary/40 active:scale-95"
-            onClick={async () => {
-              const updatedSettings = { ...notificationSettings, productNews: true };
-              setNotificationSettings(updatedSettings);
-              setFeedback({ section: 'news', message: 'Activando alertas de novedades...' });
-              try {
-                const { error } = await supabase.auth.updateUser({ data: { productNews: true } });
-                if (error) throw error;
-                setFeedback({ section: 'news', message: '¡Perfecto! Te avisaremos vía email de estas y otras novedades.' });
-              } catch (err) {
-                setFeedback({ section: 'news', message: 'Acción no completada. Intenta en Notificaciones.' });
-              }
-            }}
-          >
-            Suscribirse a novedades
-          </Button>
-        </section>
-
         <Button
           color="gray"
           onClick={onSignOut}

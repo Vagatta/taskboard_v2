@@ -279,10 +279,39 @@ const TaskList = forwardRef(function TaskList(
     [projectId, userId]
   );
 
+  const updateTaskDueDate = useCallback(
+    async (task, nextDueDate) => {
+      if (!projectId) {
+        return;
+      }
+
+      setErrorMessage('');
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ due_date: nextDueDate, updated_by: userId, updated_at: new Date().toISOString() })
+        .eq('id', task.id)
+        .eq('project_id', projectId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data) {
+        setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+      }
+    },
+    [projectId, userId]
+  );
+
   const createdFromDate = useMemo(() => parseDateInput(createdFromFilter), [createdFromFilter]);
   const createdToDate = useMemo(() => parseDateInput(createdToFilter, { endOfDay: true }), [createdToFilter]);
   const dueBeforeDate = useMemo(() => parseDateInput(dueBeforeFilter, { endOfDay: true }), [dueBeforeFilter]);
   const completedBeforeDate = useMemo(() => parseDateInput(completedBeforeFilter, { endOfDay: true }), [completedBeforeFilter]);
+
 
   // Presencia en tiempo real en el tablero.
   useEffect(() => {
@@ -1609,7 +1638,9 @@ const TaskList = forwardRef(function TaskList(
               </thead>
               <tbody>
                 {paginatedTasks.map((task) => {
-                  const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
+                  const isAssigned = Boolean(task.assigned_to);
+                  const isEditingAssignee = assigneeEditTaskId === task.id;
+                  const isAssigning = assigningTaskId === task.id;
                   const statusMeta = task.completed
                     ? { label: 'Completada', color: 'success' }
                     : { label: 'Pendiente', color: 'warning' };
@@ -1699,7 +1730,47 @@ const TaskList = forwardRef(function TaskList(
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{assigneeMember?.member_email ?? 'Sin asignar'}</td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        {members.length > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <Select
+                              sizing="sm"
+                              value={task.assigned_to ?? ''}
+                              disabled={
+                                isAssigning ||
+                                (isAssigned && !isEditingAssignee)
+                              }
+                              className="w-full min-w-[10rem]"
+                              onChange={(event) => {
+                                event.stopPropagation();
+                                const value = event.target.value || null;
+                                void updateTaskAssignee(task, value);
+                                setAssigneeEditTaskId(null);
+                              }}
+                            >
+                              <option value="">Sin asignar</option>
+                              {members.map((member) => (
+                                <option key={member.member_id} value={member.member_id}>
+                                  {member.member_email ?? member.member_id}
+                                </option>
+                              ))}
+                            </Select>
+                            {isAssigned && !isEditingAssignee ? (
+                              <Button
+                                color="dark"
+                                size="xs"
+                                pill
+                                disabled={isAssigning}
+                                onClick={() => setAssigneeEditTaskId(task.id)}
+                              >
+                                Cambiar
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs">Sin colaboradores</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {task.priority ? (
                           <Badge
@@ -1779,6 +1850,7 @@ const TaskList = forwardRef(function TaskList(
     handleBulkUpdateCompletion,
     handleBulkUpdatePriority,
     loading,
+    members,
     membersById,
     paginatedTasks,
     projectId,
@@ -1788,7 +1860,11 @@ const TaskList = forwardRef(function TaskList(
     subtaskMeta,
     tasks.length,
     totalPages,
-    toggleTaskCompletion
+    toggleTaskCompletion,
+    assigneeEditTaskId,
+    assigningTaskId,
+    updateTaskAssignee,
+    setAssigneeEditTaskId
   ]);
 
   useEffect(() => {
@@ -2477,12 +2553,29 @@ const TaskList = forwardRef(function TaskList(
               const key = formatKey(date);
               const dayTasks = tasksByDay[key] ?? [];
               const isToday = key === todayKey;
-              const weekdayName = new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(date);
+                            const weekdayName = new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(date);
 
               return (
                 <Card
+
                   key={key}
-                  className={`flex min-h-[96px] flex-col rounded-2xl border bg-white dark:bg-slate-950/60 p-2 ${isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-200 dark:border-slate-800'
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add('border-cyan-500', 'bg-cyan-50/20');
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove('border-cyan-500', 'bg-cyan-50/20');
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('border-cyan-500', 'bg-cyan-50/20');
+                    const taskId = e.dataTransfer.getData('taskId');
+                    const taskToUpdate = tasks.find(t => t.id === taskId);
+                    if (taskToUpdate && taskToUpdate.due_date !== key) {
+                      void updateTaskDueDate(taskToUpdate, key);
+                    }
+                  }}
+                  className={`flex min-h-[96px] flex-col rounded-2xl border bg-white dark:bg-slate-950/60 p-2 transition-all ${isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-200 dark:border-slate-800'
                     }`}
                 >
                   <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
@@ -2500,18 +2593,23 @@ const TaskList = forwardRef(function TaskList(
                         const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
                         const assigneeLabel = assigneeMember?.member_email ?? task.assigned_to ?? 'Sin asignar';
                         const isAuthUserAssignee = task.assigned_to === userId;
-
+ 
                         const priorityColorClass = task.priority === 'high'
                           ? 'border-rose-500/50 bg-rose-100 dark:bg-rose-900/30 text-rose-900 dark:text-rose-100'
                           : task.priority === 'medium'
                             ? 'border-amber-500/50 bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100'
                             : 'border-emerald-500/50 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100';
-
+ 
                         return (
                           <button
                             key={task.id}
                             type="button"
-                            className={`w-full rounded-lg border px-1 py-0.5 text-left text-[11px] transition-colors ${isAuthUserAssignee
+                            draggable="true"
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('taskId', task.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            className={`w-full rounded-lg border px-1 py-0.5 text-left text-[11px] transition-colors cursor-move ${isAuthUserAssignee
                               ? 'ring-1 ring-cyan-500/50'
                               : ''
                               } ${priorityColorClass} hover:opacity-80`}
@@ -2536,6 +2634,7 @@ const TaskList = forwardRef(function TaskList(
               );
             })}
           </div>
+
 
           <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-800/50">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400">

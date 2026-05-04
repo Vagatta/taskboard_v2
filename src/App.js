@@ -15,6 +15,7 @@ import { supabase } from './supabaseClient';
 import QuickSearchModal from './components/QuickSearchModal';
 import { useAuth } from './context/AuthContext';
 import CookieConsent from './components/CookieConsent';
+import TaskAlertsFab from './components/TaskAlertsFab';
 
 const navIcons = {
   dashboard: (
@@ -360,7 +361,7 @@ function App() {
   const [invitationStatus, setInvitationStatus] = useState({ processing: false, type: null, message: '' });
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
-  const { data: userGlobalStats = { workspaces: 0, projects: 0, tasks: 0, completed: 0, collaborators: 0 } } = useUserGlobalStats(user);
+  const { data: userGlobalStats = { workspaces: 0, projects: 0, tasks: 0, completed: 0, pending: 0, dueToday: 0, overdue: 0, collaborators: 0 } } = useUserGlobalStats(user, selectedWorkspaceId);
 
 
   const selectedProject = useMemo(
@@ -838,6 +839,7 @@ function App() {
         label: 'Mis tareas',
         description: 'Todas las tareas asignadas a ti',
         active: activePrimaryView === 'my-tasks',
+        badge: userGlobalStats.pending > 0 ? `${userGlobalStats.pending}` : undefined,
         icon: navIcons.dashboard,
         onClick: () => setActivePrimaryView('my-tasks')
       },
@@ -1120,6 +1122,7 @@ function App() {
         />
         <CookieConsent />
       </AppLayout>
+      {user && <TaskAlertsFab user={user} projects={projects} />}
     </>
   );
 }

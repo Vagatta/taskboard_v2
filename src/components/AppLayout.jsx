@@ -144,7 +144,7 @@ export default function AppLayout({
             {sidebarFooter ? <div className="mt-6 border-t border-slate-200 dark:border-slate-800/60 pt-6">{sidebarFooter}</div> : null}
           </div>
         </aside>
-        <main className="no-scrollbar flex-1 flex flex-col overflow-hidden px-4 pb-20 lg:pb-0 lg:px-10 lg:max-w-7xl lg:mx-auto">
+        <main className="no-scrollbar flex-1 flex flex-col overflow-hidden px-4 pb-20 lg:pb-0 lg:px-10 lg:mx-auto">
           {/* Mobile Header Acts as Top Bar */}
           {/* Mobile Header Acts as Top Bar - Removed redundant nav items */}
 

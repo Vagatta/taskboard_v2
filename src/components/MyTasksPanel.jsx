@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Dropdown, Select } from 'flowbite-react';
+import { Alert, Badge, Button, Card, Dropdown, Select } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import Skeleton from './ui/Skeleton';
@@ -445,6 +445,10 @@ export default function MyTasksPanel({
     [calendarData.tasksByDay]
   );
 
+  const pendingTasksCount = useMemo(() => {
+    return tasks.filter(t => !t.completed).length;
+  }, [tasks]);
+
   const emptyStateMessage = useMemo(() => {
     if (tasks.length === 0) {
       return 'No tienes tareas asignadas todavía.';
@@ -676,7 +680,18 @@ export default function MyTasksPanel({
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Mis tareas</h1>
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Mis tareas
+              {pendingTasksCount > 0 ? (
+                <Badge color="info" size="xl" className="rounded-full px-2.5 py-0.5 shadow-sm">
+                  {pendingTasksCount}
+                </Badge>
+              ) : (
+                <Badge color="gray" size="xl" className="rounded-full px-2.5 py-0.5 opacity-30">
+                  0
+                </Badge>
+              )}
+            </h1>
           </div>
         </div>
 
@@ -846,7 +861,23 @@ export default function MyTasksPanel({
                 return (
                   <div
                     key={key}
-                    className={`min-h-[140px] rounded-2xl border p-3 ${isToday
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('border-cyan-400', 'bg-cyan-100/30', 'dark:bg-cyan-900/20');
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove('border-cyan-400', 'bg-cyan-100/30', 'dark:bg-cyan-900/20');
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('border-cyan-400', 'bg-cyan-100/30', 'dark:bg-cyan-900/20');
+                      const taskId = e.dataTransfer.getData('taskId');
+                      const taskToUpdate = tasks.find(t => t.id === taskId);
+                      if (taskToUpdate && taskToUpdate.due_date !== key) {
+                        void handleUpdateDueDate(taskId, key);
+                      }
+                    }}
+                    className={`min-h-[140px] rounded-2xl border p-3 transition-all ${isToday
                       ? 'border-cyan-400 bg-cyan-50/60 dark:border-cyan-500 dark:bg-cyan-900/10'
                       : 'border-slate-200 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-950/30'
                       }`}
@@ -1155,6 +1186,11 @@ function CalendarTaskCard({
     <div
       role="button"
       tabIndex={0}
+      draggable="true"
+      onDragStart={(e) => {
+        e.dataTransfer.setData('taskId', task.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       onClick={() => {
         if (!task.project_id) return;
         onOpen?.();
@@ -1167,7 +1203,7 @@ function CalendarTaskCard({
         }
       }}
       title={!task.project_id ? 'Esta tarea no tiene tablero asociado' : undefined}
-      className={`task-complete-surface relative overflow-visible rounded-xl border px-2.5 py-2 text-left transition-colors ${task.completed ? 'is-completed' : ''} ${task.project_id ? `${PROJECT_COLOR_DEFAULTS.calendarInteractive} cursor-pointer` : 'cursor-default'} ${cardClassName}`}
+      className={`task-complete-surface relative overflow-visible rounded-xl border px-2.5 py-2 text-left transition-colors cursor-move ${task.completed ? 'is-completed' : ''} ${task.project_id ? `${PROJECT_COLOR_DEFAULTS.calendarInteractive} cursor-pointer` : 'cursor-default'} ${cardClassName}`}
     >
       {isCelebrating ? <TaskConfettiBurst key={celebrationKey} pieceCount={confettiMode === 'festive' ? 12 : 6} /> : null}
       <div className="flex items-start justify-between gap-2">

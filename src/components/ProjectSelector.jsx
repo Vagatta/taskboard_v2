@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Select, Spinner, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProjects, useProjectMembers, useWorkspaceMembers } from '../hooks/useSupabaseQueries';
+import { useProjects, useProjectMembers, useWorkspaceMembers, useProjectTaskCounts } from '../hooks/useSupabaseQueries';
 
 export default function ProjectSelector({
   user,
@@ -17,6 +17,7 @@ export default function ProjectSelector({
   const { data: projectsData = [], isLoading: loadingProjects } = useProjects(workspaceId);
   const { data: membersData = [] } = useProjectMembers(selectedProjectId);
   const { data: workspaceMemberData = [] } = useWorkspaceMembers(workspaceId);
+  const { data: projectTaskCounts = {} } = useProjectTaskCounts(workspaceId);
 
   const projects = useMemo(() => projectsData ?? [], [projectsData]);
   const members = useMemo(() => membersData ?? [], [membersData]);
@@ -661,6 +662,10 @@ export default function ProjectSelector({
                               </p>
                               <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                                 {isActive ? 'Tablero activo' : 'Haz clic para abrirlo'}
+                                <span className="mx-1.5 opacity-30">·</span>
+                                <span className={projectTaskCounts[project.id] > 0 ? 'text-amber-500/80 font-medium' : ''}>
+                                  {projectTaskCounts[project.id] || 0} pendientes
+                                </span>
                               </p>
                             </div>
                             <span className={`mt-0.5 h-2.5 w-2.5 rounded-full shrink-0 ${isActive ? 'bg-cyan-500 shadow-[0_0_0_4px_rgba(6,182,212,0.15)]' : 'bg-slate-300 dark:bg-slate-600 group-hover:bg-slate-400'}`}></span>
