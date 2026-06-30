@@ -361,7 +361,7 @@ export default function WorkspaceSelector({
                                   </Button>
                                   <Button
                                     size="xs"
-                                    color="failure"
+                                    color="red"
                                     onClick={() => handleCancelInvitation(invitation.id)}
                                   >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

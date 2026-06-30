@@ -63,3 +63,23 @@ if (typeof window !== 'undefined' && !window.__suppressResizeObserverError) {
   window.__suppressResizeObserverError = true;
 }
 reportWebVitals();
+
+// Carga del manifiesto PWA de forma dinámica después de la carga inicial para evitar bloquear el renderizado
+if (typeof window !== 'undefined') {
+  const loadManifest = () => {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      const publicUrl = process.env.PUBLIC_URL || '/Taskboard';
+      link.href = `${publicUrl.replace(/\/$/, '')}/manifest.json`;
+      document.head.appendChild(link);
+    }
+  };
+
+  if (document.readyState === 'complete') {
+    loadManifest();
+  } else {
+    window.addEventListener('load', loadManifest);
+  }
+}
+

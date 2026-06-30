@@ -1,21 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUserGlobalStats } from './hooks/useSupabaseQueries';
 import { Alert, Button, Card, Checkbox, Label, Spinner, TextInput } from 'flowbite-react';
 import './App.css';
 import AppLayout from './components/AppLayout';
-import StatsDashboard from './components/StatsDashboard';
-import WorkspacePeopleDashboard from './components/WorkspacePeopleDashboard';
-import ProjectsManagementPanel from './components/ProjectsManagementPanel';
-import MyTasksPanel from './components/MyTasksPanel';
-import UserPanel from './components/UserPanel';
-import NotificationPanel from './components/NotificationPanel';
 import ThemeToggle from './components/ThemeToggle';
-// import AcceptInvitation from './components/AcceptInvitation'; // Invitation system removed
 import { supabase } from './supabaseClient';
-import QuickSearchModal from './components/QuickSearchModal';
 import { useAuth } from './context/AuthContext';
-import CookieConsent from './components/CookieConsent';
-import TaskAlertsFab from './components/TaskAlertsFab';
+import { ToastProvider } from './hooks/useToast';
+
+// Lazy-loaded components (code-split into separate chunks)
+const StatsDashboard = lazy(() => import('./components/StatsDashboard'));
+const WorkspacePeopleDashboard = lazy(() => import('./components/WorkspacePeopleDashboard'));
+const ProjectsManagementPanel = lazy(() => import('./components/ProjectsManagementPanel'));
+const MyTasksPanel = lazy(() => import('./components/MyTasksPanel'));
+const UserPanel = lazy(() => import('./components/UserPanel'));
+const NotificationPanel = lazy(() => import('./components/NotificationPanel'));
+const QuickSearchModal = lazy(() => import('./components/QuickSearchModal'));
+const CookieConsent = lazy(() => import('./components/CookieConsent'));
+const TaskAlertsFab = lazy(() => import('./components/TaskAlertsFab'));
 
 const navIcons = {
   dashboard: (
@@ -279,14 +281,14 @@ function WelcomeSplashScreen({ theme, onComplete }) {
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    // Definimos un tiempo mínimo de visualización para que el efecto se aprecie bien (mínimo 2.5s)
+    // Definimos un tiempo mínimo de visualización muy corto para mejorar FCP/LCP (300ms)
     const timer = setTimeout(() => {
       setIsExiting(true);
       // Esperamos a que la animación de salida termine antes de llamar a onComplete
       setTimeout(() => {
         onComplete();
-      }, 600);
-    }, 2800);
+      }, 300);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
@@ -912,7 +914,7 @@ function App() {
             {user?.email}
           </p>
         </div>
-        <Button size="xs" color="failure" onClick={signOut} pill>
+        <Button size="xs" color="red" onClick={signOut} pill>
           Salir
         </Button>
       </div>
@@ -974,6 +976,13 @@ function App() {
             onTaskSummaryChange={setTaskSummary}
             assigneePreset={assigneePreset}
             initialTaskId={initialTaskId}
+            onTaskClick={(taskId) => {
+              setActivePrimaryView('dashboard');
+              setActiveManagementTab('tableros');
+              setAssigneePreset('all');
+              setInitialTaskId(taskId);
+              setTimeout(() => setInitialTaskId(null), 500);
+            }}
           />
         )}
         {activeManagementTab === 'stats' && (
@@ -1084,8 +1093,14 @@ function App() {
           ? notificationsSection
           : profileSection;
 
+  const suspenseFallback = (
+    <div className="flex items-center justify-center py-12">
+      <Spinner size="lg" />
+    </div>
+  );
+
   return (
-    <>
+    <ToastProvider>
       {invitationStatus.message && user ? (
         <div className="fixed right-4 top-4 z-50 max-w-md">
           <Alert color={invitationStatus.type === 'failure' ? 'failure' : invitationStatus.type === 'success' ? 'success' : 'info'}>
@@ -1106,24 +1121,28 @@ function App() {
         sidebarActions={sidebarActions}
         sidebarFooter={sidebarFooter}
       >
-        {user ? authenticatedContent : unauthenticatedContent}
-        <QuickSearchModal
-          isOpen={isSearchOpen}
-          onClose={() => setIsSearchOpen(false)}
-          selectedWorkspaceId={selectedWorkspaceId}
-          onSelectTask={(task) => {
-            setSelectedProjectId(task.project_id);
-            setActivePrimaryView('dashboard');
-            setActiveManagementTab('tableros');
-            setAssigneePreset('all');
-            setInitialTaskId(task.id);
-            setTimeout(() => setInitialTaskId(null), 500);
-          }}
-        />
-        <CookieConsent />
+        <Suspense fallback={suspenseFallback}>
+          {user ? authenticatedContent : unauthenticatedContent}
+          <QuickSearchModal
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            selectedWorkspaceId={selectedWorkspaceId}
+            onSelectTask={(task) => {
+              setSelectedProjectId(task.project_id);
+              setActivePrimaryView('dashboard');
+              setActiveManagementTab('tableros');
+              setAssigneePreset('all');
+              setInitialTaskId(task.id);
+              setTimeout(() => setInitialTaskId(null), 500);
+            }}
+          />
+          <CookieConsent />
+        </Suspense>
       </AppLayout>
-      {user && <TaskAlertsFab user={user} projects={projects} />}
-    </>
+      <Suspense fallback={null}>
+        {user && <TaskAlertsFab user={user} projects={projects} />}
+      </Suspense>
+    </ToastProvider>
   );
 }
 

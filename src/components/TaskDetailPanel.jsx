@@ -1195,7 +1195,7 @@ function SubtaskItem({ subtask, membersById, onToggleSubtask, onDeleteSubtask })
       />
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm font-medium ${subtask.completed ? 'text-slate-500 line-through' : 'text-white'
+          className={`text-sm font-medium ${subtask.completed ? 'text-slate-500 line-through' : 'text-slate-900 dark:text-white'
             }`}
         >
           {subtask.title}
@@ -1208,7 +1208,7 @@ function SubtaskItem({ subtask, membersById, onToggleSubtask, onDeleteSubtask })
           ) : null}
         </div>
       </div>
-      <Button size="xs" color="failure" pill onClick={() => onDeleteSubtask(subtask.id)}>
+      <Button size="xs" color="red" pill onClick={() => onDeleteSubtask(subtask.id)}>
         Eliminar
       </Button>
     </div>

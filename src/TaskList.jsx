@@ -5,10 +5,12 @@ import MentionDigest from './components/MentionDigest';
 import TaskDetailPanel from './components/TaskDetailPanel';
 import CustomBoardView from './components/CustomBoardView';
 import TaskKanbanBoard from './components/TaskKanbanBoard';
+import TaskTimelineView from './components/TaskTimelineView';
 import TaskCreatePanel from './components/TaskCreatePanel';
 import TaskFiltersPanel from './components/TaskFiltersPanel';
 import JotformImporter from './components/JotformImporter';
 import { supabase } from './supabaseClient';
+import { useToast } from './hooks/useToast';
 import { playSuccessSound } from './utils/audioHelpers';
 import { calculateStreak, formatRelativeTime, humanizeEventType, parseDateInput } from './utils/dateHelpers';
 import confetti from 'canvas-confetti';
@@ -18,9 +20,10 @@ const TaskList = forwardRef(function TaskList(
   { user, projectId, project, members = [], workspaceId = null, assigneePreset = null, onViewModeChange, onTaskSummaryChange, initialTaskId = null, defaultViewMode = 'list' },
   ref
 ) {
+  const toast = useToast();
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
-
+  const [newTaskStartDate, setNewTaskStartDate] = useState('');
 
   const lastSummaryRef = useRef(null);
   const detailPanelRef = useRef(null);
@@ -86,7 +89,7 @@ const TaskList = forwardRef(function TaskList(
       supabase
         .from('tasks')
         .select(
-          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,updated_by,updated_at,priority,effort,tags,epic'
+          'id,title,project_id,created_by,assigned_to,owner_email,completed,completed_at,inserted_at,description,due_date,start_date,updated_by,updated_at,priority,effort,tags,epic'
         )
         .eq('project_id', projectId)
         .order('inserted_at', { ascending: false });
@@ -290,6 +293,35 @@ const TaskList = forwardRef(function TaskList(
       const { data, error } = await supabase
         .from('tasks')
         .update({ due_date: nextDueDate, updated_by: userId, updated_at: new Date().toISOString() })
+        .eq('id', task.id)
+        .eq('project_id', projectId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      if (data) {
+        setTasks((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+      }
+    },
+    [projectId, userId]
+  );
+
+  // eslint-disable-next-line no-unused-vars
+  const updateTaskStartDate = useCallback(
+    async (task, nextStartDate) => {
+      if (!projectId) {
+        return;
+      }
+
+      setErrorMessage('');
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ start_date: nextStartDate, updated_by: userId, updated_at: new Date().toISOString() })
         .eq('id', task.id)
         .eq('project_id', projectId)
         .select()
@@ -853,6 +885,7 @@ const TaskList = forwardRef(function TaskList(
 
       if (error) {
         setSubtaskError(error.message);
+        toast.error('Error al añadir subtarea: ' + error.message);
         throw error;
       }
 
@@ -866,8 +899,9 @@ const TaskList = forwardRef(function TaskList(
         recalcSubtaskStats(taskId, nextList);
         return { ...previous, [taskId]: nextList };
       });
+      toast.success('Subtarea añadida');
     },
-    [recalcSubtaskStats, userId]
+    [recalcSubtaskStats, userId, toast]
   );
 
   const handleGenerateSubtasks = useCallback(
@@ -898,8 +932,9 @@ const TaskList = forwardRef(function TaskList(
           Title: "${title}"
           Description: "${description}"
           
+          IMPORTANT: All subtasks must be written in Spanish (español).
           Return ONLY a raw JSON array of strings. Do not use Markdown code blocks. Do not add explanations.
-          Example: ["Analyze requirements", "Draft design", "Implement core logic"]
+          Example: ["Analizar requisitos", "Borrador de diseño", "Implementar lógica principal"]
         `;
 
         let response = await fetch(API_URL, {
@@ -955,7 +990,10 @@ const TaskList = forwardRef(function TaskList(
           .insert(newSubtasks)
           .select();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          toast.error('Error al generar subtareas: ' + insertError.message);
+          throw insertError;
+        }
 
         // --- UPDATE LOCAL STATE ---
         setSubtasksByTaskId((previous) => {
@@ -964,15 +1002,17 @@ const TaskList = forwardRef(function TaskList(
           recalcSubtaskStats(taskId, nextList);
           return { ...previous, [taskId]: nextList };
         });
+        toast.success('Subtareas generadas correctamente');
 
       } catch (err) {
         console.error("Error generating subtasks:", err);
         setSubtaskError(err.message || 'Error al generar subtareas con IA.');
+        toast.error('Error al generar subtareas: ' + (err.message || 'Error desconocido'));
       } finally {
         setSubtasksLoadingMap((prev) => ({ ...prev, [taskId]: false }));
       }
     },
-    [userId, recalcSubtaskStats]
+    [userId, recalcSubtaskStats, toast]
   );
 
   const handleToggleSubtask = useCallback(
@@ -1001,6 +1041,7 @@ const TaskList = forwardRef(function TaskList(
           .maybeSingle();
 
         if (error) {
+          toast.error('Error al actualizar subtarea: ' + error.message);
           throw error;
         }
 
@@ -1020,7 +1061,7 @@ const TaskList = forwardRef(function TaskList(
         throw error;
       }
     },
-    [recalcSubtaskStats, subtasksByTaskId, userId]
+    [recalcSubtaskStats, subtasksByTaskId, userId, toast]
   );
 
   const handleDeleteSubtask = useCallback(
@@ -1044,6 +1085,7 @@ const TaskList = forwardRef(function TaskList(
 
       if (error) {
         setSubtaskError(error.message);
+        toast.error('Error al eliminar subtarea: ' + error.message);
         throw error;
       }
 
@@ -1053,8 +1095,9 @@ const TaskList = forwardRef(function TaskList(
         recalcSubtaskStats(taskId, nextList);
         return { ...previous, [taskId]: nextList };
       });
+      toast.success('Subtarea eliminada');
     },
-    [recalcSubtaskStats]
+    [recalcSubtaskStats, toast]
   );
 
   const quickFilters = useMemo(() => {
@@ -1156,6 +1199,7 @@ const TaskList = forwardRef(function TaskList(
           owner_email: userEmail,
           created_by: userId,
           updated_by: userId,
+          start_date: newTaskStartDate || null,
           due_date: newTaskDueDate || null,
           priority: newTaskPriority,
           effort: newTaskEffort
@@ -1167,6 +1211,7 @@ const TaskList = forwardRef(function TaskList(
             project_id: projectId,
             created_by: userId,
             updated_by: userId,
+            start_date: newTaskStartDate || null,
             due_date: newTaskDueDate || null,
             priority: newTaskPriority,
             effort: newTaskEffort
@@ -1181,6 +1226,7 @@ const TaskList = forwardRef(function TaskList(
         if (insertResult.data) {
           setTasks((prev) => [insertResult.data, ...prev]);
           setNewTask('');
+          setNewTaskStartDate('');
           setNewTaskDueDate('');
           setNewTaskPriority('medium');
           setNewTaskEffort('m');
@@ -1189,7 +1235,7 @@ const TaskList = forwardRef(function TaskList(
         setAddingTask(false);
       }
     },
-    [newTask, newTaskDueDate, newTaskEffort, newTaskPriority, projectId, userEmail, userId]
+    [newTask, newTaskStartDate, newTaskDueDate, newTaskEffort, newTaskPriority, projectId, userEmail, userId]
   );
 
   const toggleTaskCompletion = useCallback(
@@ -2017,7 +2063,7 @@ const TaskList = forwardRef(function TaskList(
         if (typeof parsed.searchQuery === 'string') {
           setSearchQuery(parsed.searchQuery);
         }
-        if (parsed.viewMode && ['list', 'kanban', 'calendar', 'boards'].includes(parsed.viewMode)) {
+        if (parsed.viewMode && ['list', 'kanban', 'calendar', 'boards', 'timeline'].includes(parsed.viewMode)) {
           setViewMode(parsed.viewMode);
         }
         if (typeof parsed.createdFromFilter === 'string') {
@@ -2116,7 +2162,7 @@ const TaskList = forwardRef(function TaskList(
         }
       },
       toggleViewMode: () => {
-        const sequence = ['list', 'kanban', 'calendar', 'boards'];
+        const sequence = ['list', 'kanban', 'calendar', 'boards', 'timeline'];
         setViewMode((previous) => {
           const currentIndex = sequence.indexOf(previous);
           if (currentIndex === -1) {
@@ -2318,7 +2364,7 @@ const TaskList = forwardRef(function TaskList(
                 {task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
               </Button>
               <Button
-                color="failure"
+                color="red"
                 pill
                 size="xs"
                 disabled={isProcessing}
@@ -2557,7 +2603,6 @@ const TaskList = forwardRef(function TaskList(
 
               return (
                 <Card
-
                   key={key}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -2575,31 +2620,31 @@ const TaskList = forwardRef(function TaskList(
                       void updateTaskDueDate(taskToUpdate, key);
                     }
                   }}
-                  className={`flex min-h-[96px] flex-col rounded-2xl border bg-white dark:bg-slate-950/60 p-2 transition-all ${isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-200 dark:border-slate-800'
+                  className={`flex min-h-[80px] flex-col rounded-xl border bg-white dark:bg-slate-950/60 p-1.5 transition-all ${isToday ? 'border-cyan-400/80 shadow-cyan-500/30' : 'border-slate-200 dark:border-slate-800'
                     }`}
                 >
-                  <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="mb-0.5 flex items-center justify-between text-[10px] text-slate-400">
                     <span className={isToday ? 'font-semibold text-cyan-600 dark:text-cyan-200' : 'font-semibold text-slate-900 dark:text-slate-200'}>
                       <span className="capitalize sm:hidden mr-1">{weekdayName}</span>
                       {date.getDate()}
                     </span>
-                    <Badge color={dayTasks.length ? 'info' : 'gray'}>{dayTasks.length}</Badge>
+                    {dayTasks.length > 0 && <span className="text-[9px] text-slate-500">{dayTasks.length}</span>}
                   </div>
-                  <div className="flex-1 space-y-1 overflow-y-auto pr-1">
+                  <div className="flex-1 space-y-0.5 overflow-y-auto pr-0.5">
                     {dayTasks.length === 0 ? (
-                      <p className="text-[10px] text-slate-500">Sin tareas.</p>
+                      <p className="text-[9px] text-slate-500">Sin tareas.</p>
                     ) : (
-                      dayTasks.slice(0, 3).map((task) => {
+                      dayTasks.slice(0, 4).map((task) => {
                         const assigneeMember = task.assigned_to ? membersById[task.assigned_to] : null;
-                        const assigneeLabel = assigneeMember?.member_email ?? task.assigned_to ?? 'Sin asignar';
+                        const assigneeInitial = assigneeMember?.member_email?.charAt(0).toUpperCase() ?? (task.assigned_to ? '?' : '-');
                         const isAuthUserAssignee = task.assigned_to === userId;
- 
+
                         const priorityColorClass = task.priority === 'high'
-                          ? 'border-rose-500/50 bg-rose-100 dark:bg-rose-900/30 text-rose-900 dark:text-rose-100'
+                          ? 'border-rose-500/40 bg-rose-100/70 dark:bg-rose-900/20 text-rose-900 dark:text-rose-100'
                           : task.priority === 'medium'
-                            ? 'border-amber-500/50 bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100'
-                            : 'border-emerald-500/50 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100';
- 
+                            ? 'border-amber-500/40 bg-amber-100/70 dark:bg-amber-900/20 text-amber-900 dark:text-amber-100'
+                            : 'border-emerald-500/40 bg-emerald-100/70 dark:bg-emerald-900/20 text-emerald-900 dark:text-emerald-100';
+
                         return (
                           <button
                             key={task.id}
@@ -2609,8 +2654,8 @@ const TaskList = forwardRef(function TaskList(
                               e.dataTransfer.setData('taskId', task.id);
                               e.dataTransfer.effectAllowed = 'move';
                             }}
-                            className={`w-full rounded-lg border px-1 py-0.5 text-left text-[11px] transition-colors cursor-move ${isAuthUserAssignee
-                              ? 'ring-1 ring-cyan-500/50'
+                            className={`w-full rounded border px-1 py-0.5 text-left text-[10px] transition-colors cursor-move ${isAuthUserAssignee
+                              ? 'ring-1 ring-cyan-500/40'
                               : ''
                               } ${priorityColorClass} hover:opacity-80`}
                             onClick={() => {
@@ -2620,14 +2665,16 @@ const TaskList = forwardRef(function TaskList(
                             }}
                             title={task.title}
                           >
-                            <div className="whitespace-normal break-words leading-tight">{task.title}</div>
-                            <div className="truncate text-[10px] text-slate-400" title={`Resp: ${assigneeLabel}`}>Resp: {assigneeLabel}</div>
+                            <div className="flex items-center gap-1">
+                              <span className="truncate leading-tight">{task.title}</span>
+                              <span className="shrink-0 text-[9px] text-slate-400">{assigneeInitial}</span>
+                            </div>
                           </button>
                         );
                       })
                     )}
-                    {dayTasks.length > 3 ? (
-                      <p className="text-[10px] text-slate-500">+{dayTasks.length - 3} más</p>
+                    {dayTasks.length > 4 ? (
+                      <p className="text-[9px] text-slate-500">+{dayTasks.length - 4} más</p>
                     ) : null}
                   </div>
                 </Card>
@@ -2677,6 +2724,59 @@ const TaskList = forwardRef(function TaskList(
       );
     }
 
+    if (mode === 'timeline') {
+      const timelineFilteredTasks = tasks.filter((task) => {
+        if (assigneeFilter === 'unassigned' && task.assigned_to) return false;
+        if (assigneeFilter !== 'all' && assigneeFilter !== 'unassigned' && task.assigned_to !== assigneeFilter) {
+          return false;
+        }
+        if (priorityFilter !== 'all') {
+          const priority = task.priority ?? 'medium';
+          if (priority !== priorityFilter) {
+            return false;
+          }
+        }
+        if (effortFilter !== 'all') {
+          const effort = task.effort ?? 'm';
+          if (effort !== effortFilter) {
+            return false;
+          }
+        }
+        if (tagFilter.trim()) {
+          const normalizedTag = tagFilter.trim().toLowerCase();
+          const taskTags = Array.isArray(task.tags) ? task.tags : [];
+          const hasTag = taskTags.some(
+            (tag) => typeof tag === 'string' && tag.trim().toLowerCase() === normalizedTag
+          );
+          if (!hasTag) {
+            return false;
+          }
+        }
+        if (searchQuery.trim()) {
+          const query = searchQuery.trim().toLowerCase();
+          const title = task.title?.toLowerCase() ?? '';
+          const description = task.description?.toLowerCase() ?? '';
+          if (!title.includes(query) && !description.includes(query)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      return (
+        <TaskTimelineView
+          tasks={timelineFilteredTasks}
+          membersById={membersById}
+          members={members}
+          projectId={projectId}
+          userId={userId}
+          onTaskUpdated={(updatedTask) => {
+            setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+          }}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -2684,6 +2784,7 @@ const TaskList = forwardRef(function TaskList(
   const kanbanContent = renderModeContent('kanban');
   const calendarContent = renderModeContent('calendar');
   const boardsContent = renderModeContent('boards');
+  const timelineContent = renderModeContent('timeline');
 
   return (
     <div className="space-y-6">
@@ -2901,6 +3002,7 @@ const TaskList = forwardRef(function TaskList(
                       <TaskCreatePanel
                         projectId={projectId}
                         newTask={newTask}
+                        newTaskStartDate={newTaskStartDate}
                         newTaskDueDate={newTaskDueDate}
                         newTaskPriority={newTaskPriority}
                         newTaskEffort={newTaskEffort}
@@ -2908,6 +3010,7 @@ const TaskList = forwardRef(function TaskList(
                         inputRef={newTaskInputRef}
                         onSubmit={addTask}
                         onChangeTitle={setNewTask}
+                        onChangeStartDate={setNewTaskStartDate}
                         onChangeDueDate={setNewTaskDueDate}
                         onChangePriority={setNewTaskPriority}
                         onChangeEffort={setNewTaskEffort}
@@ -2963,6 +3066,13 @@ const TaskList = forwardRef(function TaskList(
                         )
                       },
                       {
+                        id: 'timeline', label: 'Cronograma', icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M7.5 3v13.5M15 3v13.5M10.5 18.75h7.5m-7.5 3H15M13.5 12.75h7.5m-7.5 3H15m3 3.75h1.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H18m-1.5 3V5.25" />
+                          </svg>
+                        )
+                      },
+                      {
                         id: 'detail', label: 'Detalle', disabled: !selectedTaskDetail, icon: (
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -2997,6 +3107,7 @@ const TaskList = forwardRef(function TaskList(
                     {viewMode === 'kanban' && <div className="mt-4">{kanbanContent}</div>}
                     {viewMode === 'calendar' && <div className="mt-4">{calendarContent}</div>}
                     {viewMode === 'boards' && <div className="mt-4">{boardsContent}</div>}
+                    {viewMode === 'timeline' && <div className="mt-4">{timelineContent}</div>}
                     {viewMode === 'detail' && selectedTaskDetail && (
                       <div
                         ref={detailPanelRef}
@@ -3066,6 +3177,7 @@ const TaskList = forwardRef(function TaskList(
             <TaskCreatePanel
               projectId={projectId}
               newTask={newTask}
+              newTaskStartDate={newTaskStartDate}
               newTaskDueDate={newTaskDueDate}
               newTaskPriority={newTaskPriority}
               newTaskEffort={newTaskEffort}
@@ -3073,6 +3185,7 @@ const TaskList = forwardRef(function TaskList(
               inputRef={newTaskInputRef}
               onSubmit={addTask}
               onChangeTitle={setNewTask}
+              onChangeStartDate={setNewTaskStartDate}
               onChangeDueDate={setNewTaskDueDate}
               onChangePriority={setNewTaskPriority}
               onChangeEffort={setNewTaskEffort}

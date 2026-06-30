@@ -12,15 +12,6 @@ header('Access-Control-Allow-Headers: Content-Type, X-API-Key');
 // Carga la configuración del servidor (no se toca nada en ella)
 require_once __DIR__ . '/config.php';
 
-// Sistema de log personalizado para depuración (AL PRINCIPIO PARA CAPTURAR TODO)
-$log_file = __DIR__ . '/debug.log';
-$inputRaw = file_get_contents('php://input');
-$headers = getallheaders();
-$log_entry = "[" . date('Y-m-d H:i:s') . "] METHOD: " . $_SERVER['REQUEST_METHOD'] . "\n";
-$log_entry .= "HEADERS: " . json_encode($headers) . "\n";
-$log_entry .= "PAYLOAD: " . $inputRaw . "\n";
-file_put_contents($log_file, $log_entry, FILE_APPEND);
-
 // ============================
 // Autenticación
 // ============================
@@ -40,11 +31,11 @@ if (empty(SUPABASE_SERVICE_ROLE_KEY) || empty(SYSTEM_USER_ID)) {
 // ============================
 // Leer body JSON
 // ============================
+$inputRaw = file_get_contents('php://input');
 $input = json_decode($inputRaw, true);
 
 if (!$input && $_SERVER['REQUEST_METHOD'] === 'POST') {
     http_response_code(400);
-    file_put_contents($log_file, "ERROR: JSON inválido\n", FILE_APPEND);
     echo json_encode(['success' => false, 'error' => 'Body JSON inválido']);
     exit;
 }
@@ -132,7 +123,18 @@ try {
         $unifiedName = "Proyecto Externo (ID: $projectId)";
     }
     else {
-        $unifiedName = ($source === 'solicitud_4d') ? PROJECT_4D_NAME : PROJECT_PROJECTS_NAME;
+        switch ($source) {
+            case 'solicitud_4d':
+                $unifiedName = PROJECT_4D_NAME;
+                break;
+            case 'solicitud_proyecto_asociado':
+                $unifiedName = PROJECT_ASOCIADO_NAME;
+                break;
+            case 'solicitud_proyecto':
+            default:
+                $unifiedName = PROJECT_PROJECTS_NAME;
+                break;
+        }
 
         $projRes = supabaseRequest('GET', 'projects', null, 'name=eq.' . urlencode($unifiedName) . '&workspace_id=eq.' . $workspaceId . '&select=id&limit=1');
 
@@ -148,8 +150,7 @@ try {
                 'owner_email' => SYSTEM_USER_EMAIL
             ]);
             if (empty($newProj[0]['id'])) {
-                error_log("Taskboard API ERROR al crear proyecto '$unifiedName'. Respuesta: " . json_encode($newProj));
-                throw new Exception("Error al crear el proyecto '$unifiedName'. Ver logs del servidor.");
+                throw new Exception("Error al crear el proyecto '$unifiedName'. Respuesta: " . json_encode($newProj));
             }
             $projectId = $newProj[0]['id'];
 

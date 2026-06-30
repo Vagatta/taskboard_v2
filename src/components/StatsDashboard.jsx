@@ -234,13 +234,7 @@ export default function StatsDashboard({
 
                 <div className="relative grid gap-8 md:grid-cols-2 items-center">
                     <div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-                            </span>
-                            Tu Impacto Global
-                        </div>
+                       
                         <h3 className="text-3xl font-black text-white leading-tight">
                             Has completado <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{globalStats.completed}</span> tareas en toda la plataforma
                         </h3>

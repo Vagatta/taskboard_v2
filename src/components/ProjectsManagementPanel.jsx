@@ -18,7 +18,8 @@ export default function ProjectsManagementPanel({
   taskListRef,
   onTaskSummaryChange,
   assigneePreset,
-  initialTaskId
+  initialTaskId,
+  onTaskClick
 }) {
   const createdAt = selectedProject?.inserted_at ? new Date(selectedProject.inserted_at) : null;
   const [timelineTasks, setTimelineTasks] = useState([]);
@@ -77,26 +78,40 @@ export default function ProjectsManagementPanel({
     };
 
     return timelineTasks
-      .filter((task) => !task.completed)
       .map((task) => {
         const referenceDate = task.due_date ?? task.inserted_at ?? task.updated_at ?? null;
         const referenceTimestamp = referenceDate ? new Date(referenceDate).getTime() : Number.POSITIVE_INFINITY;
         const assignedMember = selectedProjectMembers.find((member) => member.member_id === task.assigned_to);
         const isOverdue = Boolean(task.due_date && !task.completed && new Date(task.due_date).getTime() < Date.now());
+        const isCompleted = Boolean(task.completed);
+        const isUrgent = Boolean(task.title && task.title.toLowerCase().includes('urgente'));
+
+        let tone = 'default';
+        if (isCompleted) {
+          tone = 'completed';
+        } else if (isUrgent) {
+          tone = 'urgent';
+        } else if (isOverdue) {
+          tone = 'warning';
+        } else if (task.priority === 'high') {
+          tone = 'active';
+        }
 
         return {
           id: task.id,
-          title: isOverdue ? 'Vencida' : task.due_date ? 'Próxima tarea' : 'Tarea creada',
+          title: isCompleted ? 'Completada' : isUrgent ? 'Urgente' : isOverdue ? 'Vencida' : task.due_date ? 'Próxima tarea' : 'Tarea creada',
           description: task.title,
           meta: [
             referenceDate ? formatDate(referenceDate) : null,
             task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baja' : 'Media',
             assignedMember?.member_email ?? (task.assigned_to ? 'Asignada' : 'Sin asignar')
           ].filter(Boolean).join(' · '),
-          tone: isOverdue ? 'warning' : task.priority === 'high' ? 'active' : 'default',
+          tone,
           dateLabel: referenceDate ? formatDate(referenceDate) : 'Sin fecha',
           sortTimestamp: referenceTimestamp,
-          isOverdue
+          isOverdue,
+          isCompleted,
+          isUrgent
         };
       })
       .sort((first, second) => {
@@ -213,27 +228,36 @@ export default function ProjectsManagementPanel({
               {visibleTimelineItems.map((item) => {
                 const isActive = item.tone === 'active';
                 const isWarning = item.tone === 'warning';
-                const isSuccess = item.tone === 'success';
+                const isCompleted = item.tone === 'completed';
+                const isUrgent = item.tone === 'urgent';
 
-                const cardClass = isActive
-                  ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                  : isWarning
-                    ? 'border-amber-500/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-                    : isSuccess
-                      ? 'border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'
-                      : 'border-slate-200 bg-white/50 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-300';
+                const cardClass = isCompleted
+                  ? 'border-slate-200/50 bg-slate-100/40 text-slate-400 opacity-60 dark:border-slate-800/50 dark:bg-slate-900/20 dark:text-slate-500'
+                  : isUrgent
+                    ? 'border-red-500/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 shadow-sm shadow-red-500/10'
+                    : isWarning
+                      ? 'border-amber-500/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                      : isActive
+                        ? 'border-cyan-500/30 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                        : 'border-slate-200 bg-white/50 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-300';
 
-                const chipClass = isActive
-                  ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
-                  : isWarning
-                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                    : isSuccess
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
+                const chipClass = isCompleted
+                  ? 'bg-slate-200/50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500'
+                  : isUrgent
+                    ? 'bg-red-500/10 text-red-700 dark:text-red-300'
+                    : isWarning
+                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                      : isActive
+                        ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
 
                 return (
                   <div key={item.id} className="flex items-center gap-3">
-                    <div className={`flex min-h-[150px] w-[280px] flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-200 ${cardClass}`}>
+                    <button
+                      type="button"
+                      onClick={() => onTaskClick?.(item.id)}
+                      className={`flex min-h-[150px] w-[280px] flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${cardClass}`}
+                    >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${chipClass}`}>
@@ -243,16 +267,16 @@ export default function ProjectsManagementPanel({
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2">{item.description}</h4>
-                          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-3">{item.meta}</p>
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 text-left">{item.description}</h4>
+                          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-3 text-left">{item.meta}</p>
                         </div>
                       </div>
 
                       <div className="mt-4 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{isSuccess ? 'Hecha' : isWarning ? 'Vencida' : isActive ? 'Prioritaria' : 'Planificada'}</span>
+                        <span>{isCompleted ? 'Hecha' : isUrgent ? 'Urgente' : isWarning ? 'Vencida' : isActive ? 'Prioritaria' : 'Planificada'}</span>
                         <span>{item.dateLabel}</span>
                       </div>
-                    </div>
+                    </button>
 
                     <div className="flex h-full items-center">
                       <div className="h-px w-10 bg-slate-200 dark:bg-slate-800" />

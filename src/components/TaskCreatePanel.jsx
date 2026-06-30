@@ -3,6 +3,7 @@ import { Card, Button, Select, TextInput } from 'flowbite-react';
 export default function TaskCreatePanel({
   projectId,
   newTask,
+  newTaskStartDate,
   newTaskDueDate,
   newTaskPriority,
   newTaskEffort,
@@ -10,6 +11,7 @@ export default function TaskCreatePanel({
   inputRef,
   onSubmit,
   onChangeTitle,
+  onChangeStartDate,
   onChangeDueDate,
   onChangePriority,
   onChangeEffort,
@@ -40,6 +42,16 @@ export default function TaskCreatePanel({
             />
           </div>
           <div className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-end">
+            <div className="flex w-full flex-col gap-1 sm:w-auto">
+              <span>Fecha de inicio</span>
+              <input
+                type="date"
+                value={newTaskStartDate}
+                disabled={!canCreate || addingTask}
+                onChange={(event) => onChangeStartDate(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-white dark:bg-slate-900/10 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-info focus:ring-info"
+              />
+            </div>
             <div className="flex w-full flex-col gap-1 sm:w-auto">
               <span>Fecha de vencimiento</span>
               <input

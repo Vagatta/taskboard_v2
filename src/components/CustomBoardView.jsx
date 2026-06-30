@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Spinner, TextInput } from 'flowbite-react';
 import { supabase } from '../supabaseClient';
+import { useToast } from '../hooks/useToast';
 
 const COLUMN_COLORS = [
   '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'
@@ -15,6 +16,7 @@ export default function CustomBoardView({
   onToggleTaskCompletion,
   onFocusNewTaskInput
 }) {
+  const toast = useToast();
   const [boards, setBoards] = useState([]);
   const [activeBoardId, setActiveBoardId] = useState(null);
   const [columns, setColumns] = useState([]);
@@ -75,14 +77,16 @@ export default function CustomBoardView({
       .eq('project_id', projectId)
       .order('created_at', { ascending: true });
 
-    if (!error && data) {
+    if (error) {
+      toast.error('Error al cargar tablones: ' + error.message);
+    } else if (data) {
       setBoards(data);
       if (data.length > 0 && !activeBoardId) {
         setActiveBoardId(data[0].id);
       }
     }
     setLoading(false);
-  }, [projectId, activeBoardId]);
+  }, [projectId, activeBoardId, toast]);
 
   // ── Load columns + task assignments for active board ──
   const loadBoardData = useCallback(async () => {
@@ -146,7 +150,9 @@ export default function CustomBoardView({
       .select()
       .single();
 
-    if (!error && data) {
+    if (error) {
+      toast.error('Error al crear tablón: ' + error.message);
+    } else if (data) {
       // Create 3 default columns
       const defaultCols = ['Por hacer', 'En progreso', 'Hecho'];
       const colInserts = defaultCols.map((colName, idx) => ({
@@ -156,12 +162,16 @@ export default function CustomBoardView({
         color: COLUMN_COLORS[idx] ?? null
       }));
 
-      await supabase.from('project_board_columns').insert(colInserts);
+      const { error: colError } = await supabase.from('project_board_columns').insert(colInserts);
+      if (colError) {
+        toast.error('Error al crear columnas: ' + colError.message);
+      }
 
       setBoards((prev) => [...prev, data]);
       setActiveBoardId(data.id);
       setNewBoardName('');
       setCreatingBoard(false);
+      toast.success('Tablón creado correctamente');
     }
 
     setSavingBoard(false);
@@ -171,8 +181,12 @@ export default function CustomBoardView({
   const handleDeleteBoard = async (boardId) => {
     if (!window.confirm('¿Eliminar este tablón? Se perderán las columnas y asignaciones.')) return;
 
-    await supabase.from('project_boards').delete().eq('id', boardId);
-
+    const { error } = await supabase.from('project_boards').delete().eq('id', boardId);
+    if (error) {
+      toast.error('Error al eliminar tablón: ' + error.message);
+      return;
+    }
+    toast.success('Tablón eliminado');
     setBoards((prev) => prev.filter((b) => b.id !== boardId));
     if (activeBoardId === boardId) {
       setActiveBoardId(boards.find((b) => b.id !== boardId)?.id ?? null);
@@ -187,8 +201,12 @@ export default function CustomBoardView({
       return;
     }
 
-    await supabase.from('project_boards').update({ name, updated_at: new Date().toISOString() }).eq('id', activeBoardId);
-
+    const { error } = await supabase.from('project_boards').update({ name, updated_at: new Date().toISOString() }).eq('id', activeBoardId);
+    if (error) {
+      toast.error('Error al renombrar tablón: ' + error.message);
+      return;
+    }
+    toast.success('Tablón renombrado');
     setBoards((prev) => prev.map((b) => (b.id === activeBoardId ? { ...b, name } : b)));
     setEditingBoardName(false);
   };

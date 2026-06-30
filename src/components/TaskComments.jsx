@@ -554,7 +554,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
               return (
                 <div key={comment.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-3 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400 min-w-0">
-                    <span className="font-semibold text-slate-100 break-all sm:truncate max-w-full">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 break-all sm:truncate max-w-full">
                       {author?.member_email ?? (comment.author_id === currentUserId ? ownerLabel : 'Colaborador')}
                     </span>
                     {createdAt ? <span className="flex-shrink-0">{createdAt.toLocaleString()}</span> : null}
@@ -608,7 +608,7 @@ export default function TaskComments({ taskId, taskTitle, currentUserId, members
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-2 whitespace-pre-wrap break-words text-slate-100">{comment.body}</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">{comment.body}</p>
                   )}
                   {comment.file_url && (
                     <div className="mt-3">

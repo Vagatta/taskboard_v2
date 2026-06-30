@@ -296,6 +296,7 @@ export default function MyTasksPanel({
           completed_at,
           inserted_at,
           updated_at,
+          start_date,
           due_date,
           priority,
           projects(id, name, workspace_id)
@@ -486,7 +487,7 @@ export default function MyTasksPanel({
         }])
         .select(`
           id, title, project_id, assigned_to, completed, completed_at, 
-          inserted_at, updated_at, due_date, priority, 
+          inserted_at, updated_at, start_date, due_date, priority, 
           projects(id, name, workspace_id)
         `)
         .single();
@@ -850,7 +851,7 @@ export default function MyTasksPanel({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-7">
               {calendarData.cells.map((date, index) => {
                 if (!date) {
-                  return <div key={`empty-${index}`} className="hidden sm:block min-h-[140px] rounded-2xl border border-transparent" />;
+                  return <div key={`empty-${index}`} className="hidden sm:block min-h-[100px] rounded-xl border border-transparent" />;
                 }
 
                 const key = calendarData.formatKey(date);
@@ -877,24 +878,22 @@ export default function MyTasksPanel({
                         void handleUpdateDueDate(taskId, key);
                       }
                     }}
-                    className={`min-h-[140px] rounded-2xl border p-3 transition-all ${isToday
+                    className={`min-h-[100px] rounded-xl border p-2 transition-all ${isToday
                       ? 'border-cyan-400 bg-cyan-50/60 dark:border-cyan-500 dark:bg-cyan-900/10'
                       : 'border-slate-200 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-950/30'
                       }`}
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className={`text-sm font-semibold ${isToday ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-900 dark:text-white'}`}>
-                        <span className="mr-1 capitalize text-xs sm:hidden">{weekdayName}</span>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className={`text-xs font-semibold ${isToday ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-900 dark:text-white'}`}>
+                        <span className="mr-1 capitalize text-[10px] sm:hidden">{weekdayName}</span>
                         {date.getDate()}
                       </span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {dayTasks.length}
-                      </span>
+                      {dayTasks.length > 0 && <span className="text-[9px] text-slate-500">{dayTasks.length}</span>}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {dayTasks.length === 0 ? (
-                        <p className="text-[11px] text-slate-400">Sin tareas</p>
+                        <p className="text-[9px] text-slate-400">Sin tareas</p>
                       ) : (
                         dayTasks.map((task) => (
                           <CalendarTaskCard
@@ -1000,7 +999,7 @@ export default function MyTasksPanel({
                                       inserted_at: new Date().toISOString()
                                     }]).select(`
                                        id, title, project_id, assigned_to, completed, completed_at, 
-                                       inserted_at, updated_at, due_date, priority, 
+                                       inserted_at, updated_at, start_date, due_date, priority, 
                                        projects(id, name, workspace_id)
                                      `).single();
                                     if (insertError) throw insertError;
@@ -1203,12 +1202,12 @@ function CalendarTaskCard({
         }
       }}
       title={!task.project_id ? 'Esta tarea no tiene tablero asociado' : undefined}
-      className={`task-complete-surface relative overflow-visible rounded-xl border px-2.5 py-2 text-left transition-colors cursor-move ${task.completed ? 'is-completed' : ''} ${task.project_id ? `${PROJECT_COLOR_DEFAULTS.calendarInteractive} cursor-pointer` : 'cursor-default'} ${cardClassName}`}
+      className={`task-complete-surface relative overflow-visible rounded-lg border px-1.5 py-1 text-left transition-colors cursor-move ${task.completed ? 'is-completed' : ''} ${task.project_id ? `${PROJECT_COLOR_DEFAULTS.calendarInteractive} cursor-pointer` : 'cursor-default'} ${cardClassName}`}
     >
       {isCelebrating ? <TaskConfettiBurst key={celebrationKey} pieceCount={confettiMode === 'festive' ? 12 : 6} /> : null}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-1.5">
         <div className="min-w-0 flex-1">
-          <p className={`text-xs font-medium ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
+          <p className={`text-[10px] leading-tight font-medium truncate ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
             {task.title}
           </p>
         </div>
@@ -1218,13 +1217,13 @@ function CalendarTaskCard({
             event.stopPropagation();
             onToggle();
           }}
-          className={`task-complete-toggle mt-0.5 h-4 w-4 shrink-0 rounded-full border ${task.completed ? 'is-completed' : ''} ${task.completed
+          className={`task-complete-toggle mt-0 h-3 w-3 shrink-0 rounded-full border ${task.completed ? 'is-completed' : ''} ${task.completed
             ? 'border-emerald-500 bg-emerald-500'
             : 'border-slate-300 dark:border-slate-600'
             }`}
           title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
         >
-          {task.completed ? <span className="block text-[10px] leading-none text-white">✓</span> : null}
+          {task.completed ? <span className="block text-[8px] leading-none text-white">✓</span> : null}
         </button>
       </div>
     </div>

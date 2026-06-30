@@ -4,8 +4,6 @@ import { supabase } from '../supabaseClient';
 import Skeleton from './ui/Skeleton';
 import ProductivityCharts from './ProductivityCharts';
 import { formatRelativeTime } from '../utils/dateHelpers';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 // Dashboard simple para ver tareas por persona dentro del workspace actual.
 export default function WorkspacePeopleDashboard({ workspaceId, projectId, workspaceMembers = {}, onPersonClick, onTaskClick }) {
@@ -135,6 +133,11 @@ export default function WorkspacePeopleDashboard({ workspaceId, projectId, works
   }, [tasks]);
 
   const generateReport = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]);
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 

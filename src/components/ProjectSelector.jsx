@@ -97,6 +97,23 @@ export default function ProjectSelector({
     return workspaceMemberList.filter((member) => !existingIds.has(member.member_id));
   }, [membersByProject, selectedProjectId, workspaceMemberList]);
 
+  const selectedProject = useMemo(() => {
+    return projects.find((p) => p.id === selectedProjectId);
+  }, [projects, selectedProjectId]);
+
+  const canDeleteProject = useMemo(() => {
+    if (!selectedProjectId || !user) return false;
+    const isProjectCreator = selectedProject?.user_id === user.id;
+    const isWorkspaceOwner = workspaceMemberList.some((m) => m.member_id === user.id && m.role === 'owner');
+    const isProjectOwnerRole = members.some((m) => m.member_id === user.id && m.role === 'owner');
+    return isProjectCreator || isWorkspaceOwner || isProjectOwnerRole;
+  }, [selectedProjectId, user, selectedProject, workspaceMemberList, members]);
+
+  const canLeaveProject = useMemo(() => {
+    if (!selectedProjectId || !user || canDeleteProject) return false;
+    return members.some((m) => m.member_id === user.id);
+  }, [selectedProjectId, user, canDeleteProject, members]);
+
   useEffect(() => {
     const signature = JSON.stringify((projects ?? []).map((project) => ({ id: project.id, name: project.name, workspace_id: project.workspace_id })));
     if (signature === lastProjectsSignatureRef.current) {
@@ -526,18 +543,68 @@ export default function ProjectSelector({
     setRemovingMemberId(memberId);
     setError('');
     try {
-      const { error: deleteError } = await supabase
+      const { data, error: deleteError } = await supabase
         .from('project_members')
         .delete()
         .eq('project_id', projectId)
-        .eq('member_id', memberId);
+        .eq('member_id', memberId)
+        .select();
 
       if (deleteError) throw deleteError;
+      if (!data || data.length === 0) {
+        throw new Error('No tienes permisos para quitar este miembro del tablero.');
+      }
       queryClient.invalidateQueries(['projectMembers', projectId]);
     } catch (err) {
       setError(err.message);
     } finally {
       setRemovingMemberId(null);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!selectedProjectId) return;
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este tablero? Esta acción eliminará permanentemente todas las tareas y columnas y no se puede deshacer.')) {
+      return;
+    }
+    setError('');
+    try {
+      const { error: deleteError } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', selectedProjectId);
+
+      if (deleteError) throw deleteError;
+
+      showNotification('Tablero eliminado correctamente.', 'success');
+      onSelect?.(null);
+      queryClient.invalidateQueries(['projects', workspaceId]);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleLeaveProject = async () => {
+    if (!selectedProjectId || !user) return;
+    if (!window.confirm('¿Estás seguro de que deseas salir de este tablero? Dejarás de tener acceso a él y sus tareas.')) {
+      return;
+    }
+    setError('');
+    try {
+      const { error: leaveError } = await supabase
+        .from('project_members')
+        .delete()
+        .eq('project_id', selectedProjectId)
+        .eq('member_id', user.id);
+
+      if (leaveError) throw leaveError;
+
+      showNotification('Has salido del tablero correctamente.', 'success');
+      onSelect?.(null);
+      queryClient.invalidateQueries(['projects', workspaceId]);
+      queryClient.invalidateQueries(['projectMembers', selectedProjectId]);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -581,7 +648,7 @@ export default function ProjectSelector({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </Button>
-          <Button size="xs" color="failure" onClick={() => onCancel(invitation.id)}>
+          <Button size="xs" color="red" onClick={() => onCancel(invitation.id)}>
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -609,20 +676,43 @@ export default function ProjectSelector({
 
         <div className="rounded-xl border border-slate-200 bg-white/50 p-2 dark:border-slate-800 dark:bg-slate-950/30">
           <nav className="mb-3 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 dark:border-slate-800">
-            {[
-              { id: 'projects', label: 'Tableros' },
-              { id: 'create', label: 'Crear' },
-              { id: 'invite', label: 'Invitar' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${activeTab === tab.id ? 'border-cyan-500/30 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300' : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'}`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'projects', label: 'Tableros' },
+                { id: 'create', label: 'Crear' },
+                { id: 'invite', label: 'Invitar' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${activeTab === tab.id ? 'border-cyan-500/30 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300' : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {selectedProjectId && (
+              <div className="ml-auto flex items-center gap-2">
+                {canDeleteProject ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteProject}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                  >
+                    Eliminar Tablero
+                  </button>
+                ) : canLeaveProject ? (
+                  <button
+                    type="button"
+                    onClick={handleLeaveProject}
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-900/30"
+                  >
+                    Salir del Tablero
+                  </button>
+                ) : null}
+              </div>
+            )}
           </nav>
 
           {activeTab === 'projects' && (
@@ -720,7 +810,7 @@ export default function ProjectSelector({
                                 <option value="editor">Editor</option>
                                 <option value="viewer">Viewer</option>
                               </Select>
-                              <Button size="xs" color="failure" disabled={isOwner || removingMemberId === member.member_id} onClick={() => handleMemberRemoval(selectedProjectId, member.member_id)}>
+                              <Button size="xs" color="red" disabled={isOwner || removingMemberId === member.member_id} onClick={() => handleMemberRemoval(selectedProjectId, member.member_id)}>
                                 Quitar
                               </Button>
                             </div>
